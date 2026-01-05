@@ -1,0 +1,66 @@
+{% extends "base.html" %}
+
+{% block title %}Workout Templates - Gym Manager{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1><i class="bi bi-bookmark-star"></i> Workout Templates</h1>
+        <a href="{{ url_for('templates.create') }}" class="btn btn-primary">
+            <i class="bi bi-plus-circle"></i> New Template
+        </a>
+    </div>
+
+    {% if templates %}
+        <div class="row">
+            {% for template in templates %}
+                <div class="col-md-6 col-lg-4 mb-3">
+                    <div class="card h-100">
+                        <div class="card-body">
+                            <h5 class="card-title">
+                                <i class="bi bi-bookmark"></i> {{ template.name }}
+                            </h5>
+                            {% if template.notes %}
+                                <p class="card-text text-muted small">{{ template.notes[:100] }}</p>
+                            {% endif %}
+                            <p class="card-text">
+                                <small class="text-muted">
+                                    <i class="bi bi-list-check"></i>
+                                    {{ template.get_exercises()|length }} exercises
+                                </small>
+                            </p>
+                        </div>
+                        <div class="card-footer bg-transparent">
+                            <div class="btn-group w-100" role="group">
+                                <a href="{{ url_for('templates.use_template', template_id=template.id) }}"
+                                   class="btn btn-success btn-sm">
+                                    <i class="bi bi-play-fill"></i> Use
+                                </a>
+                                <a href="{{ url_for('templates.detail', template_id=template.id) }}"
+                                   class="btn btn-info btn-sm">
+                                    <i class="bi bi-eye"></i> View
+                                </a>
+                                <a href="{{ url_for('templates.edit', template_id=template.id) }}"
+                                   class="btn btn-secondary btn-sm">
+                                    <i class="bi bi-pencil"></i> Edit
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            {% endfor %}
+        </div>
+    {% else %}
+        <div class="alert alert-info">
+            <i class="bi bi-info-circle"></i> No templates yet.
+            <a href="{{ url_for('templates.create') }}" class="alert-link">Create your first template</a>
+        </div>
+    {% endif %}
+
+    <div class="mt-4">
+        <a href="{{ url_for('main.dashboard') }}" class="btn btn-outline-secondary">
+            <i class="bi bi-arrow-left"></i> Back to Dashboard
+        </a>
+    </div>
+</div>
+{% endblock %}

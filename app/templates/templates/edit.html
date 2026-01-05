@@ -1,0 +1,320 @@
+{% extends "base.html" %}
+
+{% block title %}Edit {{ workout.name }} - Gym Manager{% endblock %}
+
+{% block content %}
+<div class="container">
+    <h1 class="mb-4">
+        <i class="bi bi-bookmark-star"></i> Edit Template: {{ workout.name }}
+    </h1>
+
+    <!-- Template info -->
+    <div class="alert alert-info">
+        <i class="bi bi-info-circle"></i> This is a template. Add exercises and set target values that will be used when creating new workouts.
+    </div>
+
+    <!-- Edit Template Name -->
+    <div class="card mb-4">
+        <div class="card-header">
+            <h5 class="mb-0"><i class="bi bi-card-heading"></i> Template Name</h5>
+        </div>
+        <div class="card-body">
+            <form method="POST" action="{{ url_for('workouts.update_name', workout_id=workout.id) }}" id="name-form">
+                <div class="input-group">
+                    <input type="text" class="form-control" name="name" id="workout-name" value="{{ workout.name }}" required maxlength="100">
+                    <button type="submit" class="btn btn-primary">
+                        <i class="bi bi-check-lg"></i> Update Name
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Edit Template Notes -->
+    <div class="card mb-4">
+        <div class="card-header">
+            <h5 class="mb-0"><i class="bi bi-sticky"></i> Template Notes</h5>
+        </div>
+        <div class="card-body">
+            <form method="POST" action="{{ url_for('templates.update_notes', template_id=workout.id) }}">
+                <div class="mb-3">
+                    <textarea class="form-control" name="notes" id="template-notes" rows="3" placeholder="Add notes about this template...">{{ workout.notes or '' }}</textarea>
+                </div>
+                <button type="submit" class="btn btn-primary">
+                    <i class="bi bi-check-lg"></i> Update Notes
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <div class="row">
+        <!-- Current exercises -->
+        <div class="col-md-6 mb-4">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="bi bi-list-check"></i> Current Exercises ({{ exercises|length }})</h5>
+                </div>
+                <div class="card-body">
+                    {% if exercises %}
+                        <div id="current-exercises" class="list-group">
+                            {% for exercise in exercises %}
+                                <div class="list-group-item" id="exercise-{{ exercise.id }}">
+                                    <div class="d-flex justify-content-between align-items-start">
+                                        <div class="flex-grow-1">
+                                            <h6 class="mb-1">{{ loop.index }}. {{ exercise.exercise_name }}</h6>
+                                            <small class="text-muted">
+                                                {% if exercise.target_sets %}{{ exercise.target_sets }} sets{% endif %}
+                                                {% if exercise.target_reps %} × {{ exercise.target_reps }} reps{% endif %}
+                                                {% if exercise.target_weight %} @ {{ exercise.target_weight }} kg{% endif %}
+                                                {% if exercise.target_duration %} • {{ exercise.target_duration }}s{% endif %}
+                                            </small>
+                                        </div>
+                                        <div class="btn-group" role="group">
+                                            <button class="btn btn-sm btn-outline-secondary btn-touch reorder-exercise {% if loop.first %}disabled{% endif %}"
+                                                    data-exercise-id="{{ exercise.id }}"
+                                                    data-direction="up"
+                                                    {% if loop.first %}disabled{% endif %}
+                                                    title="Move up">
+                                                <i class="bi bi-arrow-up"></i>
+                                            </button>
+                                            <button class="btn btn-sm btn-outline-secondary btn-touch reorder-exercise {% if loop.last %}disabled{% endif %}"
+                                                    data-exercise-id="{{ exercise.id }}"
+                                                    data-direction="down"
+                                                    {% if loop.last %}disabled{% endif %}
+                                                    title="Move down">
+                                                <i class="bi bi-arrow-down"></i>
+                                            </button>
+                                            <button class="btn btn-sm btn-primary btn-touch edit-exercise"
+                                                    data-exercise-id="{{ exercise.id }}"
+                                                    data-exercise-name="{{ exercise.exercise_name }}"
+                                                    data-target-sets="{{ exercise.target_sets or '' }}"
+                                                    data-target-reps="{{ exercise.target_reps or '' }}"
+                                                    data-target-weight="{{ exercise.target_weight or '' }}"
+                                                    data-target-duration="{{ exercise.target_duration or '' }}"
+                                                    data-notes="{{ exercise.notes or '' }}"
+                                                    title="Edit">
+                                                <i class="bi bi-pencil"></i>
+                                            </button>
+                                            <button class="btn btn-sm btn-danger btn-touch remove-exercise"
+                                                    data-exercise-id="{{ exercise.id }}"
+                                                    title="Remove">
+                                                <i class="bi bi-trash"></i>
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            {% endfor %}
+                        </div>
+                    {% else %}
+                        <p class="text-muted" id="no-exercises-msg">No exercises added yet. Search and add exercises from the right.</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <!-- Add exercises -->
+        <div class="col-md-6 mb-4">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="bi bi-plus-circle"></i> Add Exercises</h5>
+                </div>
+                <div class="card-body">
+                    <!-- Search and filters -->
+                    <div class="mb-3">
+                        <input type="text" id="exercise-search" class="form-control" placeholder="Search exercises...">
+                    </div>
+
+                    <div class="row mb-3">
+                        <div class="col-md-6 mb-2">
+                            <select id="category-filter" class="form-select">
+                                <option value="">All Categories</option>
+                                {% for category in categories %}
+                                    <option value="{{ category }}">{{ category }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-md-6 mb-2">
+                            <select id="muscle-filter" class="form-select">
+                                <option value="">All Muscles</option>
+                                {% for muscle in muscles %}
+                                    <option value="{{ muscle }}">{{ muscle }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                    </div>
+
+                    <!-- Exercise list -->
+                    <div id="exercise-list" style="max-height: 400px; overflow-y: auto;">
+                        {% for exercise in all_exercises %}
+                            <div class="card mb-2 exercise-item"
+                                 data-category="{{ exercise.category }}"
+                                 data-muscle="{{ exercise.primary_muscles }}">
+                                <div class="card-body p-2">
+                                    <div class="d-flex justify-content-between align-items-start">
+                                        <div class="flex-grow-1">
+                                            <h6 class="mb-0">{{ exercise.name }}</h6>
+                                            <small class="text-muted">{{ exercise.category }}</small>
+                                        </div>
+                                        <div class="btn-group">
+                                            <button class="btn btn-sm btn-info btn-touch view-exercise-details"
+                                                    data-exercise-id="{{ exercise.id }}"
+                                                    data-exercise-name="{{ exercise.name }}"
+                                                    title="View details">
+                                                <i class="bi bi-info-circle"></i>
+                                            </button>
+                                            <button class="btn btn-sm btn-primary btn-touch add-exercise"
+                                                    data-exercise-id="{{ exercise.id }}"
+                                                    data-exercise-name="{{ exercise.name }}"
+                                                    title="Add to workout">
+                                                <i class="bi bi-plus"></i>
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="mb-4">
+        <a href="{{ url_for('templates.detail', template_id=workout.id) }}" class="btn btn-outline-secondary">
+            <i class="bi bi-arrow-left"></i> Back to Template
+        </a>
+    </div>
+</div>
+
+<!-- Exercise target values modal -->
+<div class="modal fade" id="exerciseModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Add Exercise</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <h6 id="modal-exercise-name"></h6>
+                <input type="hidden" id="modal-exercise-id">
+
+                <div class="mb-3">
+                    <label for="target-sets" class="form-label">Target Sets</label>
+                    <input type="number" class="form-control" id="target-sets" min="1" max="20" value="3">
+                </div>
+
+                <div class="mb-3">
+                    <label for="target-reps" class="form-label">Target Reps</label>
+                    <input type="number" class="form-control" id="target-reps" min="1" max="100" value="10">
+                </div>
+
+                <div class="mb-3">
+                    <label for="target-weight" class="form-label">Target Weight (kg)</label>
+                    <input type="number" class="form-control" id="target-weight" step="0.5" min="0">
+                </div>
+
+                <div class="mb-3">
+                    <label for="target-duration" class="form-label">Target Duration (seconds)</label>
+                    <input type="number" class="form-control" id="target-duration" min="0" placeholder="e.g., 30 for 30 seconds">
+                    <small class="form-text text-muted">For time-based exercises like stretches or planks</small>
+                </div>
+
+                <div class="mb-3">
+                    <label for="exercise-notes" class="form-label">Notes</label>
+                    <textarea class="form-control" id="exercise-notes" rows="2"></textarea>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" id="confirm-add-exercise">Add Exercise</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Exercise Details Modal -->
+<div class="modal fade" id="exerciseDetailsModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="details-exercise-name"></h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <!-- Loading state -->
+                <div id="details-loading" class="text-center py-4">
+                    <div class="spinner-border text-primary" role="status">
+                        <span class="visually-hidden">Loading...</span>
+                    </div>
+                </div>
+
+                <!-- Content (hidden initially) -->
+                <div id="details-content" style="display: none;">
+                    <!-- Category and muscles -->
+                    <div class="mb-3">
+                        <span class="badge bg-primary me-2" id="details-category"></span>
+                        <span class="badge bg-secondary" id="details-muscles"></span>
+                    </div>
+
+                    <!-- Description -->
+                    <div class="mb-3" id="details-description-container">
+                        <h6>Description</h6>
+                        <p id="details-description" class="text-muted"></p>
+                    </div>
+
+                    <!-- Images -->
+                    <div class="mb-3" id="details-images-container" style="display: none;">
+                        <h6>Illustrations</h6>
+                        <div class="row">
+                            <div class="col-md-6 mb-2" id="details-image1-container" style="display: none;">
+                                <img id="details-image1" class="img-fluid rounded" alt="Exercise illustration 1">
+                            </div>
+                            <div class="col-md-6 mb-2" id="details-image2-container" style="display: none;">
+                                <img id="details-image2" class="img-fluid rounded" alt="Exercise illustration 2">
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Instructions -->
+                    <div class="mb-3" id="details-instructions-container" style="display: none;">
+                        <h6>Instructions</h6>
+                        <ol id="details-instructions"></ol>
+                    </div>
+
+                    <!-- Equipment -->
+                    <div class="mb-3" id="details-equipment-container" style="display: none;">
+                        <h6>Equipment</h6>
+                        <p id="details-equipment"></p>
+                    </div>
+
+                    <!-- External links -->
+                    <div class="mb-3">
+                        <h6>External Resources</h6>
+                        <div class="d-flex gap-2">
+                            <a id="details-video-link" href="#" target="_blank" class="btn btn-sm btn-outline-danger" style="display: none;">
+                                <i class="bi bi-youtube"></i> Watch Video
+                            </a>
+                            <a id="details-exercem-link" href="#" target="_blank" class="btn btn-sm btn-outline-success">
+                                <i class="bi bi-link-45deg"></i> exercem.us
+                            </a>
+                            <a id="details-garmin-link" href="#" target="_blank" class="btn btn-sm btn-outline-primary" style="display: none;">
+                                <i class="bi bi-link-45deg"></i> Garmin Connect
+                            </a>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Error state -->
+                <div id="details-error" class="alert alert-danger" style="display: none;">
+                    Failed to load exercise details.
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="{{ url_for('static', filename='js/workout-edit.js') }}"></script>
+{% endblock %}

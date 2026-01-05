@@ -1,0 +1,186 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard - Gym Manager{% endblock %}
+
+{% block content %}
+<div class="container">
+    <h1 class="mb-4">
+        <i class="bi bi-speedometer2"></i> Dashboard
+    </h1>
+
+    <!-- Welcome message -->
+    <div class="alert alert-info">
+        <h4><i class="bi bi-person-circle"></i> Welcome, {{ current_user.username }}!</h4>
+        <p class="mb-0">Track your workouts, log your progress, and achieve your fitness goals.</p>
+    </div>
+
+    <!-- Stats cards -->
+    <div class="row mb-4">
+        <div class="col-md-4 mb-3">
+            <div class="card bg-primary text-white">
+                <div class="card-body">
+                    <h5 class="card-title"><i class="bi bi-calendar-check"></i> Total Workouts</h5>
+                    <h2 class="mb-0">{{ total_workouts }}</h2>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4 mb-3">
+            <div class="card bg-success text-white">
+                <div class="card-body">
+                    <h5 class="card-title"><i class="bi bi-check-circle"></i> Completed</h5>
+                    <h2 class="mb-0">{{ completed_workouts }}</h2>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4 mb-3">
+            <div class="card bg-info text-white">
+                <div class="card-body">
+                    <h5 class="card-title"><i class="bi bi-list-ul"></i> Exercises Available</h5>
+                    <h2 class="mb-0">{{ total_exercises }}</h2>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Quick actions -->
+    <div class="row mb-4">
+        <div class="col-md-6 mb-3">
+            <div class="card shadow">
+                <div class="card-body text-center">
+                    <i class="bi bi-plus-circle display-4 text-primary"></i>
+                    <h5 class="card-title mt-2">Create New Workout</h5>
+                    <p class="card-text">Plan your next gym session</p>
+                    <a href="{{ url_for('workouts.create') }}" class="btn btn-primary btn-lg btn-touch">
+                        <i class="bi bi-plus"></i> New Workout
+                    </a>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6 mb-3">
+            <div class="card shadow">
+                <div class="card-body text-center">
+                    <i class="bi bi-search display-4 text-info"></i>
+                    <h5 class="card-title mt-2">Browse Exercises</h5>
+                    <p class="card-text">Explore {{ total_exercises }} exercises</p>
+                    <a href="{{ url_for('exercises.browse') }}" class="btn btn-info btn-lg btn-touch">
+                        <i class="bi bi-list-ul"></i> Browse Exercises
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Strava Integration -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card shadow">
+                <div class="card-body">
+                    <h5 class="card-title">
+                        <i class="bi bi-strava" style="color: #FC4C02;"></i> Strava Integration
+                    </h5>
+                    {% if strava_connected %}
+                        <p class="mb-2">
+                            <span class="badge bg-success">Connected</span>
+                            {% if strava_username %}
+                                as {{ strava_username }}
+                            {% endif %}
+                        </p>
+                        <p class="text-muted small mb-2">Upload your completed workouts to Strava from the workout detail page.</p>
+                        <form method="POST" action="{{ url_for('strava.disconnect') }}" style="display: inline;">
+                            <button type="submit" class="btn btn-sm btn-outline-danger" onclick="return confirm('Are you sure you want to disconnect Strava?');">
+                                <i class="bi bi-x-circle"></i> Disconnect
+                            </button>
+                        </form>
+                    {% else %}
+                        <p class="text-muted mb-2">Connect your Strava account to automatically upload completed workouts as weight training activities.</p>
+                        <a href="{{ url_for('strava.connect') }}" class="btn btn-sm btn-primary">
+                            <i class="bi bi-link-45deg"></i> Connect Strava
+                        </a>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Workout Templates -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card shadow">
+                <div class="card-body">
+                    <h5 class="card-title">
+                        <i class="bi bi-bookmark-star"></i> Workout Templates
+                    </h5>
+                    <p class="text-muted mb-2">
+                        Create reusable workout plans to save time
+                    </p>
+                    <a href="{{ url_for('templates.list') }}" class="btn btn-sm btn-primary">
+                        <i class="bi bi-bookmarks"></i> Manage Templates
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Today's workouts -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <h3><i class="bi bi-calendar-day"></i> Today's Workouts ({{ today.strftime('%B %d, %Y') }})</h3>
+            {% if todays_workouts %}
+                <div class="list-group">
+                    {% for workout in todays_workouts %}
+                        <a href="{{ url_for('workouts.detail', workout_id=workout.id) }}" class="list-group-item list-group-item-action">
+                            <div class="d-flex w-100 justify-content-between">
+                                <h5 class="mb-1">{{ workout.name }}</h5>
+                                <span class="badge bg-{{ 'success' if workout.status == 'completed' else ('warning' if workout.status == 'in_progress' else 'secondary') }}">
+                                    {{ workout.status }}
+                                </span>
+                            </div>
+                            {% if workout.scheduled_time %}
+                                <p class="mb-1"><i class="bi bi-clock"></i> {{ workout.scheduled_time }}</p>
+                            {% endif %}
+                        </a>
+                    {% endfor %}
+                </div>
+            {% else %}
+                <div class="alert alert-secondary">
+                    <i class="bi bi-info-circle"></i> No workouts scheduled for today.
+                    <a href="{{ url_for('workouts.create') }}" class="alert-link">Create one now</a>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Recent workouts -->
+    <div class="row">
+        <div class="col-12">
+            <h3><i class="bi bi-clock-history"></i> Recent Workouts</h3>
+            {% if recent_workouts %}
+                <div class="list-group">
+                    {% for workout in recent_workouts %}
+                        <a href="{{ url_for('workouts.detail', workout_id=workout.id) }}" class="list-group-item list-group-item-action">
+                            <div class="d-flex w-100 justify-content-between">
+                                <h5 class="mb-1">{{ workout.name }}</h5>
+                                <span class="badge bg-{{ 'success' if workout.status == 'completed' else ('warning' if workout.status == 'in_progress' else 'secondary') }}">
+                                    {{ workout.status }}
+                                </span>
+                            </div>
+                            <p class="mb-1">
+                                <i class="bi bi-calendar"></i> {{ workout.scheduled_date }}
+                                {% if workout.scheduled_time %}- <i class="bi bi-clock"></i> {{ workout.scheduled_time }}{% endif %}
+                            </p>
+                        </a>
+                    {% endfor %}
+                </div>
+                <div class="text-center mt-3">
+                    <a href="{{ url_for('workouts.list') }}" class="btn btn-outline-primary">View All Workouts</a>
+                </div>
+            {% else %}
+                <div class="alert alert-secondary">
+                    <i class="bi bi-info-circle"></i> No workouts yet.
+                    <a href="{{ url_for('workouts.create') }}" class="alert-link">Create your first workout</a>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}

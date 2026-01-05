@@ -1,0 +1,349 @@
+{% extends "base.html" %}
+
+{% block title %}Browse Exercises - Gym Manager{% endblock %}
+
+{% block content %}
+<div class="container">
+    <h1 class="mb-4"><i class="bi bi-list-ul"></i> Browse Exercises</h1>
+
+    <!-- Search and filters -->
+    <div class="card mb-4">
+        <div class="card-body">
+            <form method="GET" action="{{ url_for('exercises.browse') }}">
+                <div class="row g-3">
+                    <!-- Search box -->
+                    <div class="col-md-6">
+                        <input type="text"
+                               name="q"
+                               class="form-control form-control-lg"
+                               placeholder="Search exercises..."
+                               value="{{ search_query or '' }}">
+                    </div>
+
+                    <!-- Category filter -->
+                    <div class="col-md-2">
+                        <select name="category" class="form-select form-select-lg">
+                            <option value="">All Categories</option>
+                            {% for category in categories %}
+                                <option value="{{ category }}" {% if selected_category == category %}selected{% endif %}>
+                                    {{ category }}
+                                </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <!-- Muscle filter -->
+                    <div class="col-md-2">
+                        <select name="muscle" class="form-select form-select-lg">
+                            <option value="">All Muscles</option>
+                            {% for muscle in muscles %}
+                                <option value="{{ muscle }}" {% if selected_muscle == muscle %}selected{% endif %}>
+                                    {{ muscle }}
+                                </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <!-- Search button -->
+                    <div class="col-md-2">
+                        <button type="submit" class="btn btn-primary btn-lg btn-touch w-100">
+                            <i class="bi bi-search"></i> Filter
+                        </button>
+                    </div>
+                </div>
+
+                {% if search_query or selected_category or selected_muscle or selected_equipment %}
+                    <div class="mt-2">
+                        <a href="{{ url_for('exercises.browse') }}" class="btn btn-sm btn-outline-secondary">
+                            <i class="bi bi-x"></i> Clear Filters
+                        </a>
+                    </div>
+                {% endif %}
+            </form>
+        </div>
+    </div>
+
+    <!-- Exercise list -->
+    {% if exercises %}
+        <div class="list-group mb-4">
+            {% for exercise in exercises %}
+                <div class="list-group-item">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <h6 class="mb-0">{{ exercise.name }}</h6>
+                        <div class="btn-group" role="group">
+                            <a href="{{ exercise.name | exercem_url }}"
+                               class="btn btn-sm btn-outline-success"
+                               target="_blank"
+                               title="View on exercem.us">
+                                <i class="bi bi-link-45deg"></i>
+                            </a>
+                            <button type="button"
+                                    class="btn btn-sm btn-outline-info view-exercise-details"
+                                    data-exercise-id="{{ exercise.id }}"
+                                    data-exercise-name="{{ exercise.name }}"
+                                    title="View details">
+                                <i class="bi bi-info-circle"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            {% endfor %}
+        </div>
+
+        <!-- Pagination -->
+        {% if total_pages > 1 %}
+            <nav aria-label="Exercise pagination">
+                <ul class="pagination justify-content-center">
+                    <li class="page-item {% if page == 1 %}disabled{% endif %}">
+                        <a class="page-link" href="{{ url_for('exercises.browse', page=page-1, q=search_query, category=selected_category, muscle=selected_muscle) }}">
+                            Previous
+                        </a>
+                    </li>
+
+                    {% for p in range(1, total_pages + 1) %}
+                        {% if p == 1 or p == total_pages or (p >= page - 2 and p <= page + 2) %}
+                            <li class="page-item {% if p == page %}active{% endif %}">
+                                <a class="page-link" href="{{ url_for('exercises.browse', page=p, q=search_query, category=selected_category, muscle=selected_muscle) }}">
+                                    {{ p }}
+                                </a>
+                            </li>
+                        {% elif p == page - 3 or p == page + 3 %}
+                            <li class="page-item disabled">
+                                <span class="page-link">...</span>
+                            </li>
+                        {% endif %}
+                    {% endfor %}
+
+                    <li class="page-item {% if page == total_pages %}disabled{% endif %}">
+                        <a class="page-link" href="{{ url_for('exercises.browse', page=page+1, q=search_query, category=selected_category, muscle=selected_muscle) }}">
+                            Next
+                        </a>
+                    </li>
+                </ul>
+            </nav>
+        {% endif %}
+    {% else %}
+        <div class="alert alert-info">
+            <h5><i class="bi bi-info-circle"></i> No exercises found</h5>
+            <p class="mb-0">Try adjusting your search or filters.</p>
+        </div>
+    {% endif %}
+</div>
+
+<!-- Exercise Details Modal -->
+<div class="modal fade" id="exerciseDetailsModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="details-exercise-name"></h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <!-- Loading state -->
+                <div id="details-loading" class="text-center py-4">
+                    <div class="spinner-border text-primary" role="status">
+                        <span class="visually-hidden">Loading...</span>
+                    </div>
+                </div>
+
+                <!-- Content (hidden initially) -->
+                <div id="details-content" style="display: none;">
+                    <!-- Category and muscles -->
+                    <div class="mb-3">
+                        <span class="badge bg-primary me-2" id="details-category"></span>
+                        <span class="badge bg-secondary" id="details-muscles"></span>
+                    </div>
+
+                    <!-- Description -->
+                    <div class="mb-3" id="details-description-container">
+                        <h6>Description</h6>
+                        <p id="details-description" class="text-muted"></p>
+                    </div>
+
+                    <!-- Images -->
+                    <div class="mb-3" id="details-images-container" style="display: none;">
+                        <h6>Illustrations</h6>
+                        <div class="row">
+                            <div class="col-md-6 mb-2" id="details-image1-container" style="display: none;">
+                                <img id="details-image1" class="img-fluid rounded" alt="Exercise illustration 1">
+                            </div>
+                            <div class="col-md-6 mb-2" id="details-image2-container" style="display: none;">
+                                <img id="details-image2" class="img-fluid rounded" alt="Exercise illustration 2">
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Instructions -->
+                    <div class="mb-3" id="details-instructions-container" style="display: none;">
+                        <h6>Instructions</h6>
+                        <ol id="details-instructions"></ol>
+                    </div>
+
+                    <!-- Equipment -->
+                    <div class="mb-3" id="details-equipment-container" style="display: none;">
+                        <h6>Equipment</h6>
+                        <p id="details-equipment"></p>
+                    </div>
+
+                    <!-- External links -->
+                    <div class="mb-3">
+                        <h6>External Resources</h6>
+                        <div class="d-flex gap-2">
+                            <a id="details-video-link" href="#" target="_blank" class="btn btn-sm btn-outline-danger" style="display: none;">
+                                <i class="bi bi-youtube"></i> Watch Video
+                            </a>
+                            <a id="details-exercem-link" href="#" target="_blank" class="btn btn-sm btn-outline-success">
+                                <i class="bi bi-link-45deg"></i> exercem.us
+                            </a>
+                            <a id="details-garmin-link" href="#" target="_blank" class="btn btn-sm btn-outline-primary" style="display: none;">
+                                <i class="bi bi-link-45deg"></i> Garmin Connect
+                            </a>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Error state -->
+                <div id="details-error" class="alert alert-danger" style="display: none;">
+                    Failed to load exercise details.
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// Auto-submit form when dropdowns change
+document.addEventListener('DOMContentLoaded', function() {
+    const categorySelect = document.querySelector('select[name="category"]');
+    const muscleSelect = document.querySelector('select[name="muscle"]');
+    const filterForm = document.querySelector('form[method="GET"]');
+
+    if (categorySelect && filterForm) {
+        categorySelect.addEventListener('change', function() {
+            filterForm.submit();
+        });
+    }
+
+    if (muscleSelect && filterForm) {
+        muscleSelect.addEventListener('change', function() {
+            filterForm.submit();
+        });
+    }
+});
+
+// Exercise details modal
+document.querySelectorAll('.view-exercise-details').forEach(button => {
+    button.addEventListener('click', async function() {
+        const exerciseId = this.getAttribute('data-exercise-id');
+        const exerciseName = this.getAttribute('data-exercise-name');
+
+        // Show modal
+        const modal = new bootstrap.Modal(document.getElementById('exerciseDetailsModal'));
+        modal.show();
+
+        // Reset modal state
+        document.getElementById('details-exercise-name').textContent = exerciseName;
+        document.getElementById('details-loading').style.display = 'block';
+        document.getElementById('details-content').style.display = 'none';
+        document.getElementById('details-error').style.display = 'none';
+
+        try {
+            // Fetch exercise details
+            const response = await fetch(`/exercises/${exerciseId}/details`);
+            const data = await response.json();
+
+            if (data.error) {
+                throw new Error(data.error);
+            }
+
+            // Hide loading, show content
+            document.getElementById('details-loading').style.display = 'none';
+            document.getElementById('details-content').style.display = 'block';
+
+            // Populate modal with data
+            document.getElementById('details-category').textContent = data.category_name || '';
+            document.getElementById('details-muscles').textContent = data.primary_muscles || '';
+            document.getElementById('details-description').textContent = data.description || 'No description available';
+
+            // Images
+            const imagesContainer = document.getElementById('details-images-container');
+            const image1Container = document.getElementById('details-image1-container');
+            const image2Container = document.getElementById('details-image2-container');
+
+            let hasImages = false;
+            if (data.image1_url) {
+                document.getElementById('details-image1').src = data.image1_url;
+                image1Container.style.display = 'block';
+                hasImages = true;
+            } else {
+                image1Container.style.display = 'none';
+            }
+
+            if (data.image2_url) {
+                document.getElementById('details-image2').src = data.image2_url;
+                image2Container.style.display = 'block';
+                hasImages = true;
+            } else {
+                image2Container.style.display = 'none';
+            }
+
+            imagesContainer.style.display = hasImages ? 'block' : 'none';
+
+            // Instructions
+            const instructionsContainer = document.getElementById('details-instructions-container');
+            const instructionsList = document.getElementById('details-instructions');
+            if (data.instructions && data.instructions.length > 0) {
+                instructionsList.innerHTML = '';
+                data.instructions.forEach(instruction => {
+                    const li = document.createElement('li');
+                    li.textContent = instruction;
+                    instructionsList.appendChild(li);
+                });
+                instructionsContainer.style.display = 'block';
+            } else {
+                instructionsContainer.style.display = 'none';
+            }
+
+            // Equipment
+            const equipmentContainer = document.getElementById('details-equipment-container');
+            if (data.equipment && data.equipment.length > 0) {
+                document.getElementById('details-equipment').textContent = data.equipment.join(', ');
+                equipmentContainer.style.display = 'block';
+            } else {
+                equipmentContainer.style.display = 'none';
+            }
+
+            // External links
+            const videoLink = document.getElementById('details-video-link');
+            if (data.video) {
+                videoLink.href = data.video;
+                videoLink.style.display = 'inline-block';
+            } else {
+                videoLink.style.display = 'none';
+            }
+
+            // Exercem link
+            const exercemLink = document.getElementById('details-exercem-link');
+            exercemLink.href = `https://exercem.us/exercises/${encodeURIComponent(data.name.toLowerCase().replace(/ /g, '-'))}`;
+
+            // Garmin link
+            const garminLink = document.getElementById('details-garmin-link');
+            if (data.garmin_url) {
+                garminLink.href = data.garmin_url;
+                garminLink.style.display = 'inline-block';
+            } else {
+                garminLink.style.display = 'none';
+            }
+
+        } catch (error) {
+            console.error('Error fetching exercise details:', error);
+            document.getElementById('details-loading').style.display = 'none';
+            document.getElementById('details-error').style.display = 'block';
+        }
+    });
+});
+</script>
+{% endblock %}

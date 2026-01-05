@@ -1,0 +1,105 @@
+{% extends "base.html" %}
+
+{% block title %}{{ exercise.name }} - Gym Manager{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="row justify-content-center">
+        <div class="col-lg-8">
+            <h1 class="mb-4"><i class="bi bi-dumbbell"></i> {{ exercise.name }}</h1>
+
+            <!-- Exercise info card -->
+            <div class="card mb-4">
+                <div class="card-body">
+                    <h5 class="card-title">Description</h5>
+                    <p class="card-text">{{ exercise.description or 'No description available.' }}</p>
+
+                    <div class="row mt-3">
+                        <div class="col-md-4 mb-2">
+                            <h6><i class="bi bi-tag"></i> Category</h6>
+                            <span class="badge bg-primary">{{ exercise.category_name or 'Uncategorized' }}</span>
+                        </div>
+
+                        {% if exercise.equipment %}
+                            <div class="col-md-4 mb-2">
+                                <h6><i class="bi bi-tools"></i> Equipment</h6>
+                                {% for equip in exercise.equipment %}
+                                    <span class="badge bg-secondary me-1">{{ equip }}</span>
+                                {% endfor %}
+                            </div>
+                        {% endif %}
+
+                        {% if exercise.primary_muscles %}
+                            <div class="col-md-4 mb-2">
+                                <h6><i class="bi bi-activity"></i> Primary Muscles</h6>
+                                {% for muscle in exercise.primary_muscles %}
+                                    <span class="badge bg-success me-1">{{ muscle }}</span>
+                                {% endfor %}
+                            </div>
+                        {% endif %}
+                    </div>
+
+                    {% if exercise.secondary_muscles %}
+                        <div class="mt-2">
+                            <h6><i class="bi bi-activity"></i> Secondary Muscles</h6>
+                            {% for muscle in exercise.secondary_muscles %}
+                                <span class="badge bg-info me-1">{{ muscle }}</span>
+                            {% endfor %}
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Instructions -->
+            {% if exercise.instructions %}
+                <div class="card mb-4">
+                    <div class="card-header">
+                        <h5 class="mb-0"><i class="bi bi-list-ol"></i> Instructions</h5>
+                    </div>
+                    <div class="card-body">
+                        <ol class="mb-0">
+                            {% for instruction in exercise.instructions %}
+                                <li class="mb-2">{{ instruction }}</li>
+                            {% endfor %}
+                        </ol>
+                    </div>
+                </div>
+            {% endif %}
+
+            <!-- Video -->
+            {% if exercise.video %}
+                <div class="card mb-4">
+                    <div class="card-header">
+                        <h5 class="mb-0"><i class="bi bi-play-btn"></i> Video Tutorial</h5>
+                    </div>
+                    <div class="card-body">
+                        {% if 'youtube.com' in exercise.video or 'youtu.be' in exercise.video %}
+                            {% set video_id = exercise.video.split('v=')[-1].split('&')[0] if 'v=' in exercise.video else exercise.video.split('/')[-1] %}
+                            <div class="ratio ratio-16x9">
+                                <iframe src="https://www.youtube.com/embed/{{ video_id }}"
+                                        allowfullscreen></iframe>
+                            </div>
+                        {% else %}
+                            <a href="{{ exercise.video }}" target="_blank" class="btn btn-primary">
+                                <i class="bi bi-play-fill"></i> Watch Video
+                            </a>
+                        {% endif %}
+                    </div>
+                </div>
+            {% endif %}
+
+            <!-- Actions -->
+            <div class="d-grid gap-2">
+                <a href="{{ exercise.name | exercem_url }}"
+                   class="btn btn-success btn-lg btn-touch"
+                   target="_blank">
+                    <i class="bi bi-link-45deg"></i> View on exercem.us
+                </a>
+                <a href="{{ url_for('exercises.browse') }}" class="btn btn-outline-secondary btn-lg btn-touch">
+                    <i class="bi bi-arrow-left"></i> Back to Exercises
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

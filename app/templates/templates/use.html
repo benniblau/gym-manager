@@ -1,0 +1,71 @@
+{% extends "base.html" %}
+
+{% block title %}Use Template - {{ template.name }}{% endblock %}
+
+{% block content %}
+<div class="container">
+    <h1 class="mb-4">
+        <i class="bi bi-calendar-plus"></i> Create Workout from Template
+    </h1>
+
+    <div class="card mb-4">
+        <div class="card-body">
+            <h5 class="card-title">
+                <i class="bi bi-bookmark"></i> {{ template.name }}
+            </h5>
+            <p class="text-muted">
+                <i class="bi bi-list-check"></i>
+                {{ template.get_exercises()|length }} exercises
+            </p>
+            {% if template.notes %}
+                <p class="small mb-0">{{ template.notes }}</p>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-body">
+            <h5 class="card-title">Schedule Workout</h5>
+            <form method="POST">
+                <div class="mb-3">
+                    <label for="scheduled_date" class="form-label">Date *</label>
+                    <input type="date"
+                           class="form-control"
+                           id="scheduled_date"
+                           name="scheduled_date"
+                           value="{{ today }}"
+                           required>
+                </div>
+
+                <div class="mb-3">
+                    <label for="scheduled_time" class="form-label">Time (optional)</label>
+                    <input type="time"
+                           class="form-control"
+                           id="scheduled_time"
+                           name="scheduled_time">
+                </div>
+
+                <div class="mb-3">
+                    <label for="notes" class="form-label">Notes (optional)</label>
+                    <textarea class="form-control"
+                              id="notes"
+                              name="notes"
+                              rows="3"
+                              placeholder="Add any specific notes for this workout...">{{ template.notes if template.notes else '' }}</textarea>
+                </div>
+
+                <div class="alert alert-info">
+                    <i class="bi bi-info-circle"></i> This will create a new workout with all exercises from the template. You can then modify it as needed.
+                </div>
+
+                <div class="d-grid gap-2">
+                    <button type="submit" class="btn btn-primary btn-lg btn-touch">
+                        <i class="bi bi-check-circle"></i> Create Workout
+                    </button>
+                    <a href="{{ url_for('templates.list') }}" class="btn btn-secondary">Cancel</a>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

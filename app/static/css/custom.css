@@ -1,0 +1,285 @@
+/* Mobile-first custom styles for Gym Manager */
+
+/* Large touch targets (minimum 44x44px for mobile) */
+.btn-touch {
+    min-height: 48px;
+    min-width: 48px;
+    font-size: 1.1rem;
+}
+
+/* Large form inputs for easy mobile interaction */
+.form-control-lg,
+.form-select-lg {
+    font-size: 1.25rem;
+    min-height: 50px;
+}
+
+/* Exercise cards for logging interface */
+.exercise-card {
+    margin-bottom: 1rem;
+    touch-action: manipulation;
+    border: 2px solid transparent;
+    transition: border-color 0.3s ease;
+}
+
+.exercise-card:hover {
+    border-color: var(--bs-primary);
+}
+
+/* Number stepper controls */
+.input-group-stepper {
+    display: flex;
+}
+
+.input-group-stepper .btn {
+    min-width: 48px;
+    flex: 0 0 auto;
+}
+
+.input-group-stepper .form-control {
+    flex: 1 1 auto;
+    text-align: center;
+    font-weight: bold;
+    font-size: 1.5rem;
+}
+
+/* Hide number input spinners on mobile */
+input[type=number]::-webkit-inner-spin-button,
+input[type=number]::-webkit-outer-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+}
+
+input[type=number] {
+    -moz-appearance: textfield;
+}
+
+/* Save status indicators */
+.save-status {
+    display: inline-block;
+    transition: all 0.3s ease;
+}
+
+/* Progress bar styling */
+.progress {
+    background-color: rgba(255, 255, 255, 0.1);
+}
+
+/* Card styling for dark theme */
+.card {
+    background-color: var(--bs-dark);
+    border-color: var(--bs-gray-dark);
+}
+
+/* Sticky footer */
+.footer {
+    margin-top: 3rem;
+}
+
+/* Navbar enhancements */
+.navbar-brand {
+    font-weight: bold;
+    font-size: 1.3rem;
+}
+
+/* Badge enhancements */
+.badge {
+    padding: 0.5rem 0.75rem;
+    font-size: 0.9rem;
+}
+
+/* List group improvements */
+.list-group-item {
+    background-color: var(--bs-dark);
+    border-color: var(--bs-gray-dark);
+    margin-bottom: 0.5rem;
+    border-radius: 0.5rem !important;
+}
+
+.list-group-item:hover {
+    background-color: rgba(255, 255, 255, 0.05);
+}
+
+/* Card header styling */
+.card-header {
+    font-weight: bold;
+}
+
+/* Alert improvements */
+.alert {
+    border-radius: 0.5rem;
+}
+
+/* Responsive typography */
+@media (max-width: 768px) {
+    h1 {
+        font-size: 1.75rem;
+    }
+
+    h2 {
+        font-size: 1.5rem;
+    }
+
+    h3 {
+        font-size: 1.25rem;
+    }
+
+    /* Make buttons full width on mobile */
+    .btn-lg {
+        padding: 0.75rem 1rem;
+    }
+
+    /* Reduce padding on cards for mobile */
+    .card-body {
+        padding: 1rem;
+    }
+
+    /* Stack exercise cards on mobile */
+    .exercise-card {
+        margin-bottom: 1.5rem;
+    }
+}
+
+/* Loading spinner for AJAX operations */
+.spinner-border-sm {
+    width: 1rem;
+    height: 1rem;
+    border-width: 0.15rem;
+}
+
+/* Success animation */
+@keyframes checkmark {
+    0% {
+        transform: scale(0);
+    }
+    50% {
+        transform: scale(1.2);
+    }
+    100% {
+        transform: scale(1);
+    }
+}
+
+.save-success {
+    animation: checkmark 0.3s ease;
+}
+
+/* Focus states for accessibility */
+.form-control:focus,
+.form-select:focus,
+.btn:focus {
+    box-shadow: 0 0 0 0.25rem rgba(13, 110, 253, 0.5);
+}
+
+/* Dark theme optimizations */
+body {
+    background-color: #212529;
+    color: #f8f9fa;
+}
+
+/* Link colors for dark theme */
+a {
+    color: #6ea8fe;
+}
+
+a:hover {
+    color: #8bb9fe;
+}
+
+/* Table styles for dark theme */
+table {
+    color: #f8f9fa;
+}
+
+/* Form label emphasis */
+.form-label {
+    font-weight: 500;
+    margin-bottom: 0.5rem;
+}
+
+/* Exercise item hover effect */
+.exercise-item {
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+    cursor: pointer;
+}
+
+.exercise-item:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+}
+
+/* Pagination styling */
+.pagination .page-link {
+    background-color: var(--bs-dark);
+    border-color: var(--bs-gray-dark);
+    color: #f8f9fa;
+}
+
+.pagination .page-link:hover {
+    background-color: rgba(255, 255, 255, 0.1);
+    color: #f8f9fa;
+}
+
+.pagination .page-item.active .page-link {
+    background-color: var(--bs-primary);
+    border-color: var(--bs-primary);
+}
+
+/* Dropdown menu dark theme */
+.dropdown-menu {
+    background-color: var(--bs-dark);
+    border-color: var(--bs-gray-dark);
+}
+
+.dropdown-item {
+    color: #f8f9fa;
+}
+
+.dropdown-item:hover {
+    background-color: rgba(255, 255, 255, 0.1);
+    color: #f8f9fa;
+}
+
+/* Sticky navbar enhancement */
+.sticky-top {
+    backdrop-filter: blur(10px);
+    background-color: rgba(33, 37, 41, 0.95) !important;
+}
+
+/* Workout status badges */
+.badge.bg-planned {
+    background-color: #6c757d !important;
+}
+
+.badge.bg-in-progress {
+    background-color: #ffc107 !important;
+    color: #000 !important;
+}
+
+.badge.bg-completed {
+    background-color: #198754 !important;
+}
+
+/* Smooth scrolling */
+html {
+    scroll-behavior: smooth;
+}
+
+/* Custom scrollbar for dark theme */
+::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+}
+
+::-webkit-scrollbar-track {
+    background: #212529;
+}
+
+::-webkit-scrollbar-thumb {
+    background: #495057;
+    border-radius: 5px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: #6c757d;
+}

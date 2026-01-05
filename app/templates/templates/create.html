@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+
+{% block title %}Create Template - Gym Manager{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="row justify-content-center">
+        <div class="col-md-8 col-lg-6">
+            <div class="card shadow">
+                <div class="card-body">
+                    <h2 class="card-title mb-4">
+                        <i class="bi bi-bookmark-star"></i> Create Workout Template
+                    </h2>
+
+                    <form method="POST">
+                        <div class="mb-3">
+                            <label for="name" class="form-label">Template Name *</label>
+                            <input type="text"
+                                   class="form-control form-control-lg"
+                                   id="name"
+                                   name="name"
+                                   placeholder="e.g., Upper Body, Leg Day, Full Body"
+                                   required>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="notes" class="form-label">Notes (optional)</label>
+                            <textarea class="form-control"
+                                      id="notes"
+                                      name="notes"
+                                      rows="3"
+                                      placeholder="Description of this template..."></textarea>
+                        </div>
+
+                        <div class="alert alert-info">
+                            <i class="bi bi-info-circle"></i> After creating the template, you'll be able to add exercises to it.
+                        </div>
+
+                        <div class="d-grid gap-2">
+                            <button type="submit" class="btn btn-primary btn-lg btn-touch">
+                                <i class="bi bi-check-circle"></i> Create Template
+                            </button>
+                            <a href="{{ url_for('templates.list') }}" class="btn btn-secondary">Cancel</a>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
