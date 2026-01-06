@@ -47,6 +47,46 @@
         </div>
     </div>
 
+    <!-- Privacy Settings -->
+    <div class="card mb-4">
+        <div class="card-header">
+            <h5 class="mb-0"><i class="bi bi-shield-lock"></i> Privacy Settings</h5>
+        </div>
+        <div class="card-body">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <h6 class="mb-1">
+                        Status:
+                        {% if workout.is_public %}
+                            <span class="badge bg-success"><i class="bi bi-globe"></i> Public</span>
+                        {% else %}
+                            <span class="badge bg-secondary"><i class="bi bi-lock"></i> Private</span>
+                        {% endif %}
+                    </h6>
+                    <p class="text-muted mb-0">
+                        {% if workout.is_public %}
+                            This template can be discovered and used by all users.
+                            <br><strong>Times used:</strong> {{ workout.usage_count }}
+                        {% else %}
+                            Only you can see and use this template.
+                        {% endif %}
+                    </p>
+                </div>
+                <div>
+                    <form method="POST" action="{{ url_for('templates.toggle_privacy', template_id=workout.id) }}">
+                        <button type="submit" class="btn btn-outline-primary">
+                            {% if workout.is_public %}
+                                <i class="bi bi-lock"></i> Make Private
+                            {% else %}
+                                <i class="bi bi-globe"></i> Make Public
+                            {% endif %}
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <div class="row">
         <!-- Current exercises -->
         <div class="col-md-6 mb-4">

@@ -20,11 +20,13 @@ def create():
     if request.method == 'POST':
         name = request.form.get('name')
         notes = request.form.get('notes')
+        is_public = 1 if request.form.get('is_public') else 0
 
         template = Workout.create_template(
             user_id=current_user.id,
             name=name,
-            notes=notes
+            notes=notes,
+            is_public=is_public
         )
 
         flash(f'Template "{name}" created!', 'success')
@@ -37,20 +39,26 @@ def create():
 @login_required
 def detail(template_id):
     """View template details"""
-    template = Workout.get_by_id(template_id)
+    template_dict = Workout.get_template_with_creator(template_id)
 
-    # Verify ownership and template status
-    if template.user_id != current_user.id:
-        flash('Access denied', 'danger')
+    if not template_dict:
+        flash('Template not found', 'danger')
         return redirect(url_for('templates.list'))
 
-    if not template.is_template:
-        flash('Not a template', 'danger')
-        return redirect(url_for('workouts.list'))
+    # Get template object for methods
+    template = Workout.get_by_id(template_id)
+
+    # Verify access: owner OR public
+    is_owner = template.user_id == current_user.id
+    if not is_owner and not template.is_public:
+        flash('Access denied', 'danger')
+        return redirect(url_for('templates.list'))
 
     exercises = template.get_exercises()
     return render_template('templates/detail.html',
                           template=template,
+                          template_dict=template_dict,
+                          is_owner=is_owner,
                           exercises=exercises)
 
 
@@ -123,10 +131,19 @@ def delete(template_id):
 @login_required
 def use_template(template_id):
     """Create workout from template"""
+    template_dict = Workout.get_template_with_creator(template_id)
+
+    if not template_dict:
+        flash('Template not found', 'danger')
+        return redirect(url_for('templates.list'))
+
+    # Get template object
     template = Workout.get_by_id(template_id)
 
-    if template.user_id != current_user.id or not template.is_template:
-        flash('Invalid template', 'danger')
+    # Verify access: owner OR public
+    is_owner = template.user_id == current_user.id
+    if not is_owner and not template.is_public:
+        flash('Access denied', 'danger')
         return redirect(url_for('templates.list'))
 
     if request.method == 'POST':
@@ -134,7 +151,7 @@ def use_template(template_id):
         scheduled_time = request.form.get('scheduled_time') or None
         notes = request.form.get('notes') or None
 
-        # Create workout from template
+        # Create workout from template (usage count auto-increments)
         workout = Workout.create_from_template(
             template_id=template_id,
             user_id=current_user.id,
@@ -149,4 +166,37 @@ def use_template(template_id):
     # Show form to schedule workout
     return render_template('templates/use.html',
                           template=template,
+                          template_dict=template_dict,
+                          is_owner=is_owner,
                           today=date.today())
+
+
+@templates_bp.route('/browse')
+@login_required
+def browse_public():
+    """Browse public templates"""
+    sort_by = request.args.get('sort', 'usage_count')
+    templates = Workout.get_public_templates(order_by=sort_by)
+
+    return render_template('templates/browse_public.html',
+                          templates=templates,
+                          current_sort=sort_by)
+
+
+@templates_bp.route('/<int:template_id>/toggle-privacy', methods=['POST'])
+@login_required
+def toggle_privacy(template_id):
+    """Toggle template privacy (public/private)"""
+    template = Workout.get_by_id(template_id)
+
+    if not template or template.user_id != current_user.id or not template.is_template:
+        abort(404)
+
+    try:
+        new_status = template.toggle_public()
+        status_text = 'public' if new_status else 'private'
+        flash(f'Template is now {status_text}', 'success')
+    except ValueError as e:
+        flash(str(e), 'danger')
+
+    return redirect(request.referrer or url_for('templates.detail', template_id=template_id))

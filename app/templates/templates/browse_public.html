@@ -1,0 +1,95 @@
+{% extends "base.html" %}
+
+{% block title %}Browse Public Templates - Gym Manager{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1><i class="bi bi-globe"></i> Browse Public Templates</h1>
+    </div>
+
+    <div class="alert alert-info">
+        <i class="bi bi-info-circle"></i> Discover and use workout templates created by other users in the community.
+    </div>
+
+    <!-- Sorting options -->
+    <div class="mb-4">
+        <div class="btn-group" role="group">
+            <a href="{{ url_for('templates.browse_public', sort='usage_count') }}"
+               class="btn btn-sm {% if current_sort == 'usage_count' %}btn-primary{% else %}btn-outline-primary{% endif %}">
+                <i class="bi bi-fire"></i> Most Used
+            </a>
+            <a href="{{ url_for('templates.browse_public', sort='name') }}"
+               class="btn btn-sm {% if current_sort == 'name' %}btn-primary{% else %}btn-outline-primary{% endif %}">
+                <i class="bi bi-sort-alpha-down"></i> Name
+            </a>
+            <a href="{{ url_for('templates.browse_public', sort='created_at') }}"
+               class="btn btn-sm {% if current_sort == 'created_at' %}btn-primary{% else %}btn-outline-primary{% endif %}">
+                <i class="bi bi-calendar"></i> Newest
+            </a>
+        </div>
+    </div>
+
+    {% if templates %}
+        <div class="row">
+            {% for template in templates %}
+                <div class="col-md-6 col-lg-4 mb-4">
+                    <div class="card h-100 border-success">
+                        <div class="card-header bg-success text-white">
+                            <h5 class="mb-0">
+                                <i class="bi bi-bookmark-star"></i> {{ template.name }}
+                            </h5>
+                        </div>
+                        <div class="card-body">
+                            <!-- Creator attribution -->
+                            <div class="mb-2">
+                                <span class="badge bg-primary">
+                                    <i class="bi bi-person-circle"></i> by {{ template.creator_username }}
+                                </span>
+                                <span class="badge bg-secondary">
+                                    <i class="bi bi-people"></i> {{ template.usage_count }} uses
+                                </span>
+                            </div>
+
+                            <!-- Notes preview -->
+                            {% if template.notes %}
+                                <p class="card-text text-muted small">
+                                    {{ template.notes[:150] }}{% if template.notes|length > 150 %}...{% endif %}
+                                </p>
+                            {% else %}
+                                <p class="card-text text-muted small fst-italic">No description provided</p>
+                            {% endif %}
+                        </div>
+                        <div class="card-footer bg-transparent">
+                            <div class="d-grid gap-2">
+                                <a href="{{ url_for('templates.use_template', template_id=template.id) }}"
+                                   class="btn btn-success btn-sm">
+                                    <i class="bi bi-play-fill"></i> Use This Template
+                                </a>
+                                <a href="{{ url_for('templates.detail', template_id=template.id) }}"
+                                   class="btn btn-outline-info btn-sm">
+                                    <i class="bi bi-eye"></i> View Details
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            {% endfor %}
+        </div>
+    {% else %}
+        <div class="alert alert-warning">
+            <i class="bi bi-exclamation-triangle"></i> No public templates available yet.
+            <br><br>
+            <a href="{{ url_for('templates.create') }}" class="btn btn-sm btn-primary">
+                <i class="bi bi-plus-circle"></i> Create and Share Your First Template
+            </a>
+        </div>
+    {% endif %}
+
+    <div class="mt-4">
+        <a href="{{ url_for('templates.list') }}" class="btn btn-outline-secondary">
+            <i class="bi bi-arrow-left"></i> Back to My Templates
+        </a>
+    </div>
+</div>
+{% endblock %}

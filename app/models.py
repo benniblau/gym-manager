@@ -103,6 +103,28 @@ class User:
         )
         db.commit()
 
+    def update_email(self, new_email):
+        """Update user email"""
+        db = get_db()
+        db.execute(
+            'UPDATE users SET email = ? WHERE id = ?',
+            (new_email, self.id)
+        )
+        db.commit()
+        self.email = new_email
+
+    def update_password(self, new_password):
+        """Update user password"""
+        from app import bcrypt
+        password_hash = bcrypt.generate_password_hash(new_password).decode('utf-8')
+        db = get_db()
+        db.execute(
+            'UPDATE users SET password_hash = ? WHERE id = ?',
+            (password_hash, self.id)
+        )
+        db.commit()
+        self.password_hash = password_hash
+
     # Flask-Login integration
     @property
     def is_authenticated(self):
@@ -125,7 +147,7 @@ class Workout:
 
     def __init__(self, id, user_id, name, scheduled_date, scheduled_time=None,
                  notes=None, status='planned', started_at=None, completed_at=None,
-                 is_template=0, created_at=None, updated_at=None):
+                 is_template=0, created_at=None, updated_at=None, is_public=0, usage_count=0):
         self.id = id
         self.user_id = user_id
         self.name = name
@@ -138,6 +160,8 @@ class Workout:
         self.is_template = is_template
         self.created_at = created_at
         self.updated_at = updated_at
+        self.is_public = is_public
+        self.usage_count = usage_count
 
     @staticmethod
     def get_by_id(workout_id):
@@ -262,13 +286,13 @@ class Workout:
         return [Workout(**dict(row)) for row in rows]
 
     @staticmethod
-    def create_template(user_id, name, notes=None):
+    def create_template(user_id, name, notes=None, is_public=0):
         """Create a new workout template"""
         db = get_db()
         cursor = db.execute('''
-            INSERT INTO workouts (user_id, name, scheduled_date, scheduled_time, notes, is_template, status)
-            VALUES (?, ?, NULL, NULL, ?, 1, 'planned')
-        ''', (user_id, name, notes))
+            INSERT INTO workouts (user_id, name, scheduled_date, scheduled_time, notes, is_template, status, is_public, usage_count)
+            VALUES (?, ?, NULL, NULL, ?, 1, 'planned', ?, 0)
+        ''', (user_id, name, notes, is_public))
         db.commit()
         return Workout.get_by_id(cursor.lastrowid)
 
@@ -278,12 +302,15 @@ class Workout:
         # Get template
         template = Workout.get_by_id(template_id)
 
-        # Verify ownership
-        if template.user_id != user_id:
-            raise ValueError("Template does not belong to user")
+        if not template:
+            raise ValueError("Template not found")
 
         if not template.is_template:
             raise ValueError("Workout is not a template")
+
+        # Verify ownership OR public access
+        if template.user_id != user_id and not template.is_public:
+            raise ValueError("Template is private and does not belong to user")
 
         # Create new workout with template's name
         workout = Workout.create(
@@ -308,7 +335,80 @@ class Workout:
                 notes=ex['notes']
             )
 
+        # Increment usage count
+        template.increment_usage_count()
+
         return workout
+
+    @staticmethod
+    def get_public_templates(order_by='usage_count', limit=50, offset=0):
+        """Get all public templates with creator information"""
+        db = get_db()
+
+        # Determine ORDER BY clause
+        order_clauses = {
+            'usage_count': 'w.usage_count DESC, w.name ASC',
+            'name': 'w.name ASC',
+            'created_at': 'w.created_at DESC'
+        }
+        order_clause = order_clauses.get(order_by, order_clauses['usage_count'])
+
+        rows = db.execute(f'''
+            SELECT w.*, u.username as creator_username
+            FROM workouts w
+            JOIN users u ON w.user_id = u.id
+            WHERE w.is_template = 1 AND w.is_public = 1
+            ORDER BY {order_clause}
+            LIMIT ? OFFSET ?
+        ''', (limit, offset)).fetchall()
+
+        return [dict(row) for row in rows]
+
+    @staticmethod
+    def get_template_with_creator(template_id):
+        """Get a single template with creator information"""
+        db = get_db()
+        row = db.execute('''
+            SELECT w.*, u.username as creator_username
+            FROM workouts w
+            JOIN users u ON w.user_id = u.id
+            WHERE w.id = ? AND w.is_template = 1
+        ''', (template_id,)).fetchone()
+
+        return dict(row) if row else None
+
+    def toggle_public(self):
+        """Toggle template between public and private"""
+        if not self.is_template:
+            raise ValueError("Only templates can be made public/private")
+
+        db = get_db()
+        new_status = 0 if self.is_public else 1
+
+        db.execute('''
+            UPDATE workouts
+            SET is_public = ?, updated_at = ?
+            WHERE id = ?
+        ''', (new_status, datetime.now().isoformat(), self.id))
+        db.commit()
+
+        self.is_public = new_status
+        return new_status
+
+    def increment_usage_count(self):
+        """Increment the usage count for this template"""
+        if not self.is_template:
+            return
+
+        db = get_db()
+        db.execute('''
+            UPDATE workouts
+            SET usage_count = usage_count + 1
+            WHERE id = ?
+        ''', (self.id,))
+        db.commit()
+
+        self.usage_count += 1
 
     def convert_to_template(self):
         """Convert an existing workout to a template"""

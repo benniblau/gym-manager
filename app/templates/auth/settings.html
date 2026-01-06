@@ -1,0 +1,270 @@
+{% extends "base.html" %}
+
+{% block title %}Settings - Gym Manager{% endblock %}
+
+{% block content %}
+<div class="container">
+    <h1 class="mb-4"><i class="bi bi-gear"></i> Account Settings</h1>
+
+    <div class="row">
+        <!-- Account Information -->
+        <div class="col-md-6 mb-4">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="bi bi-person-circle"></i> Account Information</h5>
+                </div>
+                <div class="card-body">
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Username</label>
+                        <input type="text" class="form-control" value="{{ current_user.username }}" disabled>
+                        <small class="text-muted">Username cannot be changed</small>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Current Email</label>
+                        <input type="text" class="form-control" value="{{ current_user.email }}" disabled>
+                    </div>
+                    <div class="mb-0">
+                        <label class="form-label fw-bold">Member Since</label>
+                        <input type="text" class="form-control" value="{{ current_user.created_at[:10] if current_user.created_at else 'N/A' }}" disabled>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Strava Connection -->
+        <div class="col-md-6 mb-4">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="bi bi-strava"></i> Strava Integration</h5>
+                </div>
+                <div class="card-body">
+                    {% if strava_connection %}
+                        <div class="alert alert-success mb-3">
+                            <i class="bi bi-check-circle"></i> Connected to Strava
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">Athlete ID</label>
+                            <input type="text" class="form-control" value="{{ strava_connection['athlete_id'] }}" disabled>
+                        </div>
+                        {% if strava_connection['athlete_username'] %}
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">Strava Username</label>
+                            <input type="text" class="form-control" value="{{ strava_connection['athlete_username'] }}" disabled>
+                        </div>
+                        {% endif %}
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">Connected Since</label>
+                            <input type="text" class="form-control" value="{{ strava_connection['connected_at'][:10] if strava_connection['connected_at'] else 'N/A' }}" disabled>
+                        </div>
+                        <form method="POST" action="{{ url_for('strava.disconnect') }}" onsubmit="return confirm('Are you sure you want to disconnect Strava? You will need to reconnect to upload workouts.')">
+                            <button type="submit" class="btn btn-danger btn-lg btn-touch w-100">
+                                <i class="bi bi-x-circle"></i> Disconnect Strava
+                            </button>
+                        </form>
+                    {% else %}
+                        <div class="alert alert-info mb-3">
+                            <i class="bi bi-info-circle"></i> Not connected to Strava
+                        </div>
+                        <p class="mb-3">Connect your Strava account to automatically upload your completed workouts.</p>
+                        <a href="{{ url_for('strava.connect') }}" class="btn btn-success btn-lg btn-touch w-100">
+                            <i class="bi bi-link-45deg"></i> Connect to Strava
+                        </a>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Update Email -->
+    <div class="card mb-4">
+        <div class="card-header">
+            <h5 class="mb-0"><i class="bi bi-envelope"></i> Update Email</h5>
+        </div>
+        <div class="card-body">
+            <form method="POST" action="{{ url_for('auth.update_email') }}">
+                {{ email_form.hidden_tag() }}
+
+                <div class="row">
+                    <div class="col-md-6 mb-3">
+                        {{ email_form.email.label(class="form-label") }}
+                        {{ email_form.email(class="form-control form-control-lg" + (" is-invalid" if email_form.email.errors else ""), placeholder="Enter new email address") }}
+                        {% if email_form.email.errors %}
+                            <div class="invalid-feedback">
+                                {% for error in email_form.email.errors %}
+                                    {{ error }}
+                                {% endfor %}
+                            </div>
+                        {% endif %}
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        {{ email_form.password.label(class="form-label") }}
+                        {{ email_form.password(class="form-control form-control-lg" + (" is-invalid" if email_form.password.errors else ""), placeholder="Verify with your current password") }}
+                        {% if email_form.password.errors %}
+                            <div class="invalid-feedback">
+                                {% for error in email_form.password.errors %}
+                                    {{ error }}
+                                {% endfor %}
+                            </div>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <div class="d-grid">
+                    {{ email_form.submit(class="btn btn-primary btn-lg btn-touch") }}
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Update Password -->
+    <div class="card mb-4">
+        <div class="card-header">
+            <h5 class="mb-0"><i class="bi bi-key"></i> Update Password</h5>
+        </div>
+        <div class="card-body">
+            <form method="POST" action="{{ url_for('auth.update_password') }}">
+                {{ password_form.hidden_tag() }}
+
+                <div class="row">
+                    <div class="col-md-4 mb-3">
+                        {{ password_form.current_password.label(class="form-label") }}
+                        {{ password_form.current_password(class="form-control form-control-lg" + (" is-invalid" if password_form.current_password.errors else ""), placeholder="Current password") }}
+                        {% if password_form.current_password.errors %}
+                            <div class="invalid-feedback">
+                                {% for error in password_form.current_password.errors %}
+                                    {{ error }}
+                                {% endfor %}
+                            </div>
+                        {% endif %}
+                    </div>
+                    <div class="col-md-4 mb-3">
+                        {{ password_form.new_password.label(class="form-label") }}
+                        {{ password_form.new_password(class="form-control form-control-lg" + (" is-invalid" if password_form.new_password.errors else ""), placeholder="New password (min 6 chars)") }}
+                        {% if password_form.new_password.errors %}
+                            <div class="invalid-feedback">
+                                {% for error in password_form.new_password.errors %}
+                                    {{ error }}
+                                {% endfor %}
+                            </div>
+                        {% endif %}
+                    </div>
+                    <div class="col-md-4 mb-3">
+                        {{ password_form.confirm_password.label(class="form-label") }}
+                        {{ password_form.confirm_password(class="form-control form-control-lg" + (" is-invalid" if password_form.confirm_password.errors else ""), placeholder="Confirm new password") }}
+                        {% if password_form.confirm_password.errors %}
+                            <div class="invalid-feedback">
+                                {% for error in password_form.confirm_password.errors %}
+                                    {{ error }}
+                                {% endfor %}
+                            </div>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <div class="d-grid">
+                    {{ password_form.submit(class="btn btn-primary btn-lg btn-touch") }}
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Manual Strava Credentials Update -->
+    <div class="card mb-4">
+        <div class="card-header">
+            <h5 class="mb-0"><i class="bi bi-key-fill"></i> Manual Strava Credentials</h5>
+        </div>
+        <div class="card-body">
+            <div class="alert alert-warning">
+                <i class="bi bi-exclamation-triangle"></i> <strong>Advanced:</strong> Only use this if you have manually obtained Strava API tokens. Incorrect values may break Strava integration.
+            </div>
+
+            <form method="POST" action="{{ url_for('auth.update_strava_credentials') }}">
+                {{ strava_form.hidden_tag() }}
+
+                <div class="row">
+                    <div class="col-md-6 mb-3">
+                        {{ strava_form.access_token.label(class="form-label") }}
+                        {{ strava_form.access_token(class="form-control" + (" is-invalid" if strava_form.access_token.errors else ""), placeholder="Enter Strava access token") }}
+                        {% if strava_form.access_token.errors %}
+                            <div class="invalid-feedback">
+                                {% for error in strava_form.access_token.errors %}
+                                    {{ error }}
+                                {% endfor %}
+                            </div>
+                        {% endif %}
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        {{ strava_form.refresh_token.label(class="form-label") }}
+                        {{ strava_form.refresh_token(class="form-control" + (" is-invalid" if strava_form.refresh_token.errors else ""), placeholder="Enter Strava refresh token") }}
+                        {% if strava_form.refresh_token.errors %}
+                            <div class="invalid-feedback">
+                                {% for error in strava_form.refresh_token.errors %}
+                                    {{ error }}
+                                {% endfor %}
+                            </div>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <div class="row">
+                    <div class="col-md-4 mb-3">
+                        {{ strava_form.expires_at.label(class="form-label") }}
+                        {{ strava_form.expires_at(class="form-control" + (" is-invalid" if strava_form.expires_at.errors else ""), placeholder="e.g., 1704067200") }}
+                        {% if strava_form.expires_at.errors %}
+                            <div class="invalid-feedback">
+                                {% for error in strava_form.expires_at.errors %}
+                                    {{ error }}
+                                {% endfor %}
+                            </div>
+                        {% endif %}
+                        <small class="text-muted">Unix timestamp format</small>
+                    </div>
+                    <div class="col-md-4 mb-3">
+                        {{ strava_form.athlete_id.label(class="form-label") }}
+                        {{ strava_form.athlete_id(class="form-control" + (" is-invalid" if strava_form.athlete_id.errors else ""), placeholder="e.g., 12345678") }}
+                        {% if strava_form.athlete_id.errors %}
+                            <div class="invalid-feedback">
+                                {% for error in strava_form.athlete_id.errors %}
+                                    {{ error }}
+                                {% endfor %}
+                            </div>
+                        {% endif %}
+                    </div>
+                    <div class="col-md-4 mb-3">
+                        {{ strava_form.athlete_username.label(class="form-label") }}
+                        {{ strava_form.athlete_username(class="form-control" + (" is-invalid" if strava_form.athlete_username.errors else ""), placeholder="Your Strava username") }}
+                        {% if strava_form.athlete_username.errors %}
+                            <div class="invalid-feedback">
+                                {% for error in strava_form.athlete_username.errors %}
+                                    {{ error }}
+                                {% endfor %}
+                            </div>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <div class="d-grid">
+                    {{ strava_form.submit(class="btn btn-warning btn-lg btn-touch") }}
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Account Actions -->
+    <div class="card border-danger mb-4">
+        <div class="card-header bg-danger text-white">
+            <h5 class="mb-0"><i class="bi bi-exclamation-triangle"></i> Danger Zone</h5>
+        </div>
+        <div class="card-body">
+            <p class="mb-3">Once you delete your account, there is no going back. This will permanently delete all your workouts, templates, and exercise logs.</p>
+            <button type="button" class="btn btn-outline-danger" disabled>
+                <i class="bi bi-trash"></i> Delete Account (Coming Soon)
+            </button>
+        </div>
+    </div>
+
+    <a href="{{ url_for('main.dashboard') }}" class="btn btn-outline-secondary mb-4">
+        <i class="bi bi-arrow-left"></i> Back to Dashboard
+    </a>
+</div>
+{% endblock %}

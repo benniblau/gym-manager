@@ -17,8 +17,13 @@
                 <div class="col-md-6 col-lg-4 mb-3">
                     <div class="card h-100">
                         <div class="card-body">
-                            <h5 class="card-title">
-                                <i class="bi bi-bookmark"></i> {{ template.name }}
+                            <h5 class="card-title d-flex justify-content-between align-items-start">
+                                <span><i class="bi bi-bookmark"></i> {{ template.name }}</span>
+                                {% if template.is_public %}
+                                    <span class="badge bg-success"><i class="bi bi-globe"></i> Public</span>
+                                {% else %}
+                                    <span class="badge bg-secondary"><i class="bi bi-lock"></i> Private</span>
+                                {% endif %}
                             </h5>
                             {% if template.notes %}
                                 <p class="card-text text-muted small">{{ template.notes[:100] }}</p>
@@ -28,6 +33,13 @@
                                     <i class="bi bi-list-check"></i>
                                     {{ template.get_exercises()|length }} exercises
                                 </small>
+                                {% if template.is_public %}
+                                    <br>
+                                    <small class="text-muted">
+                                        <i class="bi bi-people"></i>
+                                        Used {{ template.usage_count }} times
+                                    </small>
+                                {% endif %}
                             </p>
                         </div>
                         <div class="card-footer bg-transparent">
