@@ -2,11 +2,30 @@
 
 A comprehensive Flask-based web application for managing workouts, tracking exercise progress, and syncing with Strava. Built with Python, SQLite, and Bootstrap 5, this application helps fitness enthusiasts plan, log, and analyze their training sessions.
 
+## ✨ Recent Updates
+
+### Public/Private Template Sharing
+- Share your workout templates with the community or keep them private
+- Browse and discover templates created by other users
+- Track template usage statistics
+- Full ownership control (only you can edit/delete your templates)
+
+### Enhanced Settings & Strava Management
+- Comprehensive user settings page
+- Manual Strava credentials management for advanced users
+- Update email and password securely
+- View account information and membership details
+
 ## Features
 
 ### 🏋️ Workout Management
 - **Create Custom Workouts**: Build workouts from a library of 2000+ exercises across multiple categories
 - **Workout Templates**: Create reusable workout templates for consistent training routines
+- **Public/Private Templates**: Share templates with the community or keep them private
+  - Browse public templates created by other users
+  - View template usage statistics
+  - Creator attribution for shared templates
+  - Toggle template privacy with one click
 - **Exercise Library**: Browse and search exercises by category, muscle group, and equipment
 - **Target Values**: Set target sets, reps, weight, and duration for each exercise
 - **Progress Tracking**: Log actual performance and compare against targets
@@ -32,6 +51,10 @@ A comprehensive Flask-based web application for managing workouts, tracking exer
 
 ### 🔄 Strava Integration
 - **OAuth Authentication**: Securely connect your Strava account
+- **Manual Credentials Management**: Manually enter and update Strava API tokens
+  - Direct access token and refresh token management
+  - Update expiration timestamps
+  - Manage athlete ID and username
 - **Activity Upload**: Upload completed workouts to Strava
 - **Multiple Uploads**: Re-upload workouts as needed
 - **Category-Specific Emojis**: Workouts display with category-appropriate emojis (💪 for strength, 🧘 for stretching, etc.)
@@ -49,6 +72,11 @@ A comprehensive Flask-based web application for managing workouts, tracking exer
 - **Secure Authentication**: Password hashing with bcrypt
 - **User Accounts**: Individual user profiles with personalized workout history
 - **Session Management**: Secure login sessions with Flask-Login
+- **Account Settings**: Comprehensive settings page
+  - Update email address with password verification
+  - Change password securely
+  - Manage Strava connection and credentials
+  - View account information and membership details
 
 ## Tech Stack
 
@@ -165,6 +193,8 @@ Workout sessions and templates
 - `scheduled_date`, `scheduled_time`: When workout is planned
 - `status`: planned | in_progress | completed
 - `is_template`: Boolean flag for templates
+- `is_public`: Boolean flag for public templates (shareable with community)
+- `usage_count`: Number of times template has been used by others
 - `notes`: User notes
 - `started_at`, `completed_at`: Actual workout times
 
@@ -274,16 +304,55 @@ gym-manager/
 
 ### Creating a Template
 
-1. Create a workout with desired exercises
-2. Click "Save as Template"
-3. Template is now reusable for future workouts
+1. **Private Template** (default):
+   - Navigate to Templates → Create New Template
+   - Enter template name and notes
+   - Add exercises and set target values
+   - Template is saved as private (only you can see it)
+
+2. **Public Template** (shareable):
+   - When creating a template, check "Make this template public"
+   - Public templates appear in the community browse page
+   - Usage statistics are tracked
+   - You maintain full ownership (only you can edit/delete)
+
+3. **Toggle Privacy**:
+   - Edit any template
+   - Use the Privacy Settings card to toggle between public/private
+   - View usage statistics for public templates
+
+### Browsing Public Templates
+
+1. Navigate to Templates → Browse Public Templates
+2. Sort by:
+   - Most Used (default)
+   - Name (alphabetical)
+   - Newest (recently created)
+3. View template details including:
+   - Creator username
+   - Usage count
+   - Exercise list
+4. Use any public template to create your own workout
 
 ### Syncing with Strava
 
-1. Connect your Strava account (Settings → Strava)
-2. Complete a workout
-3. Click "Upload to Strava"
-4. View your activity on Strava
+1. **OAuth Connection** (recommended):
+   - Navigate to Settings
+   - Click "Connect to Strava"
+   - Authorize the application
+   - Your account is now connected
+
+2. **Manual Credentials** (advanced):
+   - Navigate to Settings → Manual Strava Credentials
+   - Enter your access token and refresh token
+   - Set expiration timestamp (Unix format)
+   - Optionally add athlete ID and username
+   - Click "Update Strava Credentials"
+
+3. **Upload Workouts**:
+   - Complete a workout
+   - Click "Upload to Strava"
+   - View your activity on Strava
 
 ### Browsing Exercises
 
@@ -302,6 +371,10 @@ gym-manager/
 - `GET /auth/register` - Registration page
 - `POST /auth/register` - Process registration
 - `GET /auth/logout` - Logout
+- `GET /auth/settings` - User settings page
+- `POST /auth/settings/update-email` - Update email address
+- `POST /auth/settings/update-password` - Update password
+- `POST /auth/settings/update-strava-credentials` - Manually update Strava tokens
 
 ### Workouts
 - `GET /workouts/` - List workouts
@@ -314,11 +387,15 @@ gym-manager/
 - `POST /workouts/<id>/delete` - Delete workout
 
 ### Templates
-- `GET /templates/` - List templates
+- `GET /templates/` - List user's templates
+- `GET /templates/browse` - Browse public templates
 - `POST /templates/create` - Create template
 - `GET /templates/<id>` - View template
+- `GET /templates/<id>/edit` - Edit template exercises
 - `POST /templates/<id>/update-notes` - Update notes
 - `POST /templates/<id>/use` - Create workout from template
+- `POST /templates/<id>/toggle-privacy` - Toggle public/private status
+- `POST /templates/<id>/delete` - Delete template
 
 ### Exercises
 - `GET /exercises/` - Browse exercises
@@ -340,6 +417,14 @@ pytest
 ```
 
 ### Database Migrations
+
+**Running Migrations:**
+```bash
+# For public templates feature
+python migrations/add_public_templates.py
+```
+
+**Creating Database from Scratch:**
 ```bash
 # Backup current database
 cp exercises.db exercises.db.backup
@@ -349,6 +434,9 @@ cp exercises.db exercises.db.backup
 # Recreate database
 python database.py
 ```
+
+**Available Migrations:**
+- `migrations/add_public_templates.py` - Adds is_public and usage_count columns to workouts table
 
 ### Adding Exercises
 Add exercises to the database using the models:
