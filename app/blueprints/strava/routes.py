@@ -197,6 +197,34 @@ def upload_workout(workout_id):
         return jsonify({'error': error_msg}), 500
 
 
+@strava_bp.route('/generate-text/<int:workout_id>')
+@login_required
+def generate_post_text(workout_id):
+    """Generate Strava post text without uploading (AJAX endpoint)"""
+    # Verify workout ownership and completion
+    workout = Workout.get_by_id(workout_id)
+    if not workout or workout.user_id != current_user.id:
+        return jsonify({'error': 'Workout not found'}), 404
+
+    if workout.status != 'completed':
+        return jsonify({'error': 'Only completed workouts can generate post text'}), 400
+
+    # Get workout exercises
+    exercises = workout.get_exercises()
+
+    if not exercises:
+        return jsonify({'error': 'Cannot generate text for workout without exercises'}), 400
+
+    # Generate description text
+    description = format_workout_description(workout, exercises)
+
+    return jsonify({
+        'success': True,
+        'text': description,
+        'title': workout.name
+    })
+
+
 @strava_bp.route('/status')
 @login_required
 def status():

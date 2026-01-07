@@ -4,6 +4,24 @@ A comprehensive Flask-based web application for managing workouts, tracking exer
 
 ## ✨ Recent Updates
 
+### Complete Exercise Database (January 2026)
+- **All 2,066 exercises now have descriptions**: Generated professional, meaningful descriptions for every exercise
+- **Exercise images**: Added 15 new bodyweight and stretching exercises with demonstration images
+- **Cloud image integration**: Seamless display of both local images and Garmin Connect cloud images
+- **Enhanced exercise browser**: Descriptions display below exercise names for quick reference
+
+### Smart Workout Scheduling
+- **Duration tracking**: Set estimated workout duration when creating from templates
+- **Automatic end time calculation**: System calculates end date/time from start time + duration
+- **Flexible scheduling**: Enter just date, or add time and duration for complete planning
+- **Spans midnight handling**: Correctly handles workouts that cross midnight
+
+### Strava Post Text Generator
+- **Generate without uploading**: Create Strava-formatted post text without connecting to Strava
+- **Copy and paste**: One-click copy to clipboard for manual posting
+- **Works for everyone**: No Strava account connection required
+- **Full formatting**: Includes emojis, exercise details, duration, and stats
+
 ### Public/Private Template Sharing
 - Share your workout templates with the community or keep them private
 - Browse and discover templates created by other users

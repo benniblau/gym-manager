@@ -80,6 +80,12 @@
                     <i class="fa-solid fa-link"></i> Connect Strava to Upload
                 </a>
             {% endif %}
+
+            <!-- Generate Post Text Button (for manual copy/paste) -->
+            <button type="button" class="btn btn-outline-secondary btn-lg btn-touch w-100 mt-2"
+                    onclick="generatePostText({{ workout.id }})">
+                <i class="fa-solid fa-clipboard"></i> Generate Strava Post Text
+            </button>
         {% endif %}
 
         <!-- Export TCX Button -->
@@ -164,7 +170,109 @@
 
 {% include 'includes/exercise_details_modal.html' %}
 
+<!-- Strava Post Text Modal -->
+<div class="modal fade" id="stravaPostTextModal" tabindex="-1" aria-labelledby="stravaPostTextModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="stravaPostTextModalLabel">
+                    <i class="fa-solid fa-clipboard"></i> Strava Post Text
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div id="postTextLoading" class="text-center py-4">
+                    <div class="spinner-border text-primary" role="status">
+                        <span class="visually-hidden">Loading...</span>
+                    </div>
+                    <p class="mt-2">Generating post text...</p>
+                </div>
+                <div id="postTextContent" style="display: none;">
+                    <div class="alert alert-info">
+                        <i class="fa-solid fa-info-circle"></i> Copy the text below and paste it into your Strava activity description.
+                    </div>
+                    <div class="mb-3">
+                        <label for="postTextArea" class="form-label"><strong>Activity Title:</strong></label>
+                        <input type="text" class="form-control" id="postTitle" readonly>
+                    </div>
+                    <div class="mb-3">
+                        <label for="postTextArea" class="form-label"><strong>Activity Description:</strong></label>
+                        <textarea class="form-control" id="postTextArea" rows="15" readonly></textarea>
+                    </div>
+                </div>
+                <div id="postTextError" style="display: none;">
+                    <div class="alert alert-danger">
+                        <i class="fa-solid fa-exclamation-triangle"></i> <span id="errorMessage"></span>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                <button type="button" class="btn btn-primary" id="copyTextBtn" onclick="copyPostText()" style="display: none;">
+                    <i class="fa-solid fa-copy"></i> Copy to Clipboard
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
 <script>
+function generatePostText(workoutId) {
+    // Show modal
+    const modal = new bootstrap.Modal(document.getElementById('stravaPostTextModal'));
+    modal.show();
+
+    // Reset modal state
+    document.getElementById('postTextLoading').style.display = 'block';
+    document.getElementById('postTextContent').style.display = 'none';
+    document.getElementById('postTextError').style.display = 'none';
+    document.getElementById('copyTextBtn').style.display = 'none';
+
+    // Fetch generated text
+    fetch(`/strava/generate-text/${workoutId}`)
+    .then(response => response.json())
+    .then(data => {
+        document.getElementById('postTextLoading').style.display = 'none';
+
+        if (data.success) {
+            document.getElementById('postTitle').value = data.title;
+            document.getElementById('postTextArea').value = data.text;
+            document.getElementById('postTextContent').style.display = 'block';
+            document.getElementById('copyTextBtn').style.display = 'inline-block';
+        } else {
+            document.getElementById('errorMessage').textContent = data.error;
+            document.getElementById('postTextError').style.display = 'block';
+        }
+    })
+    .catch(error => {
+        document.getElementById('postTextLoading').style.display = 'none';
+        document.getElementById('errorMessage').textContent = `Failed to generate text: ${error}`;
+        document.getElementById('postTextError').style.display = 'block';
+    });
+}
+
+function copyPostText() {
+    const title = document.getElementById('postTitle').value;
+    const text = document.getElementById('postTextArea').value;
+    const fullText = `${title}\n\n${text}`;
+
+    navigator.clipboard.writeText(fullText).then(() => {
+        const button = document.getElementById('copyTextBtn');
+        const originalText = button.innerHTML;
+        button.innerHTML = '<i class="fa-solid fa-check"></i> Copied!';
+        button.classList.remove('btn-primary');
+        button.classList.add('btn-success');
+
+        setTimeout(() => {
+            button.innerHTML = originalText;
+            button.classList.remove('btn-success');
+            button.classList.add('btn-primary');
+        }, 2000);
+    }).catch(err => {
+        alert('Failed to copy text. Please select and copy manually.');
+    });
+}
+
 function uploadToStrava(workoutId) {
     if (!confirm('Upload this workout to Strava?')) {
         return;
