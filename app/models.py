@@ -147,12 +147,16 @@ class Workout:
 
     def __init__(self, id, user_id, name, scheduled_date, scheduled_time=None,
                  notes=None, status='planned', started_at=None, completed_at=None,
-                 is_template=0, created_at=None, updated_at=None, is_public=0, usage_count=0):
+                 is_template=0, created_at=None, updated_at=None, is_public=0, usage_count=0,
+                 duration_minutes=None, end_date=None, end_time=None):
         self.id = id
         self.user_id = user_id
         self.name = name
         self.scheduled_date = scheduled_date
         self.scheduled_time = scheduled_time
+        self.duration_minutes = duration_minutes
+        self.end_date = end_date
+        self.end_time = end_time
         self.notes = notes
         self.status = status
         self.started_at = started_at
@@ -224,12 +228,26 @@ class Workout:
         if scheduled_time and hasattr(scheduled_time, 'isoformat'):
             scheduled_time = scheduled_time.isoformat()
 
+        # Convert end_date to string for SQLite (if provided)
+        end_date = kwargs.get('end_date')
+        if end_date and hasattr(end_date, 'isoformat'):
+            end_date = end_date.isoformat()
+
+        # Convert end_time to string for SQLite (if provided)
+        end_time = kwargs.get('end_time')
+        if end_time and hasattr(end_time, 'isoformat'):
+            end_time = end_time.isoformat()
+
         cursor = db.execute('''
-            INSERT INTO workouts (user_id, name, scheduled_date, scheduled_time, notes, status, is_template)
-            VALUES (?, ?, ?, ?, ?, ?, ?)
+            INSERT INTO workouts (user_id, name, scheduled_date, scheduled_time, duration_minutes,
+                                 end_date, end_time, notes, status, is_template)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ''', (
             user_id, name, scheduled_date,
             scheduled_time,
+            kwargs.get('duration_minutes'),
+            end_date,
+            end_time,
             kwargs.get('notes'),
             kwargs.get('status', 'planned'),
             kwargs.get('is_template', 0)
@@ -297,7 +315,8 @@ class Workout:
         return Workout.get_by_id(cursor.lastrowid)
 
     @staticmethod
-    def create_from_template(template_id, user_id, scheduled_date, scheduled_time=None, notes=None):
+    def create_from_template(template_id, user_id, scheduled_date, scheduled_time=None,
+                            duration_minutes=None, end_date=None, end_time=None, notes=None):
         """Create a new workout from a template"""
         # Get template
         template = Workout.get_by_id(template_id)
@@ -318,6 +337,9 @@ class Workout:
             name=template.name,
             scheduled_date=scheduled_date,
             scheduled_time=scheduled_time,
+            duration_minutes=duration_minutes,
+            end_date=end_date,
+            end_time=end_time,
             notes=notes or template.notes
         )
 

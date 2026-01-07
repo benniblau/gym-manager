@@ -38,11 +38,22 @@
                 </div>
 
                 <div class="mb-3">
-                    <label for="scheduled_time" class="form-label">Time (optional)</label>
+                    <label for="scheduled_time" class="form-label">Start Time (optional)</label>
                     <input type="time"
                            class="form-control"
                            id="scheduled_time"
                            name="scheduled_time">
+                </div>
+
+                <div class="mb-3">
+                    <label for="duration_minutes" class="form-label">Duration (minutes, optional)</label>
+                    <input type="number"
+                           class="form-control"
+                           id="duration_minutes"
+                           name="duration_minutes"
+                           min="1"
+                           placeholder="e.g., 60">
+                    <div class="form-text">If provided with start time, the end time will be calculated automatically.</div>
                 </div>
 
                 <div class="mb-3">

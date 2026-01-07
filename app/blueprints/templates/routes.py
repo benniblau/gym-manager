@@ -1,6 +1,6 @@
 from flask import render_template, redirect, url_for, flash, request, abort
 from flask_login import login_required, current_user
-from datetime import datetime, date
+from datetime import datetime, date, timedelta
 from app.models import Workout, WorkoutExercise, Exercise
 from app.blueprints.templates import templates_bp
 
@@ -149,14 +149,36 @@ def use_template(template_id):
     if request.method == 'POST':
         scheduled_date = request.form.get('scheduled_date')
         scheduled_time = request.form.get('scheduled_time') or None
+        duration_minutes = request.form.get('duration_minutes') or None
         notes = request.form.get('notes') or None
+
+        # Parse date
+        parsed_date = datetime.strptime(scheduled_date, '%Y-%m-%d').date()
+
+        # Calculate end_date and end_time if both scheduled_time and duration are provided
+        end_date = None
+        end_time = None
+        if scheduled_time and duration_minutes:
+            try:
+                # Combine date and time
+                start_datetime = datetime.combine(parsed_date, datetime.strptime(scheduled_time, '%H:%M').time())
+                # Add duration
+                end_datetime = start_datetime + timedelta(minutes=int(duration_minutes))
+                end_date = end_datetime.date()
+                end_time = end_datetime.time().strftime('%H:%M')
+            except (ValueError, TypeError):
+                # If calculation fails, just proceed without end time
+                pass
 
         # Create workout from template (usage count auto-increments)
         workout = Workout.create_from_template(
             template_id=template_id,
             user_id=current_user.id,
-            scheduled_date=datetime.strptime(scheduled_date, '%Y-%m-%d').date(),
+            scheduled_date=parsed_date,
             scheduled_time=scheduled_time,
+            duration_minutes=int(duration_minutes) if duration_minutes else None,
+            end_date=end_date,
+            end_time=end_time,
             notes=notes
         )
 
