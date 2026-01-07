@@ -90,10 +90,12 @@ A comprehensive Flask-based web application for managing workouts, tracking exer
 - **Python-dotenv**: Environment variable management
 
 ### Frontend
-- **Bootstrap 5**: Responsive CSS framework
+- **Bootstrap 5**: Responsive CSS framework with dark theme
 - **Bootstrap Icons**: Icon library
+- **FontAwesome**: Icon library for brand icons and extended iconography
 - **Vanilla JavaScript**: No framework dependencies
 - **Jinja2 Templates**: Server-side templating
+- **Custom Design System**: Standardized UI components, colors, and patterns (see [docs/UI_DESIGN_SYSTEM.md](docs/UI_DESIGN_SYSTEM.md))
 
 ### APIs & Integrations
 - **Strava API**: Activity sync and OAuth
@@ -263,13 +265,18 @@ gym-manager/
 │   ├── static/                  # Static assets
 │   │   ├── css/                 # Custom styles
 │   │   ├── js/                  # JavaScript files
+│   │   ├── fontawesome/         # FontAwesome icons
 │   │   └── images/              # Exercise images
 │   └── templates/               # Jinja2 templates
 │       ├── base.html            # Base template
+│       ├── includes/            # Shared template components
 │       ├── auth/                # Auth pages
 │       ├── workouts/            # Workout pages
 │       ├── exercises/           # Exercise pages
 │       └── templates/           # Template pages
+├── docs/                        # Documentation
+│   └── UI_DESIGN_SYSTEM.md      # UI standards and patterns
+├── migrations/                  # Database migrations
 ├── venv/                        # Virtual environment
 ├── exercises.db                 # SQLite database
 ├── database.py                  # Database setup script
@@ -409,6 +416,24 @@ gym-manager/
 - `POST /strava/disconnect` - Disconnect account
 
 ## Development
+
+### UI Design System
+
+This project follows a comprehensive design system for consistent UI/UX across all pages. Before making UI changes, review [docs/UI_DESIGN_SYSTEM.md](docs/UI_DESIGN_SYSTEM.md).
+
+**Key Standards**:
+- **Colors**: Official Strava orange (#FC4C02) for all Strava elements
+- **Badges**: Semantic color classes (`.badge-category`, `.badge-muscle-primary`, etc.)
+- **Buttons**: Touch-friendly sizing with `.btn-touch` (48px minimum), standardized colors by action type
+- **Components**: Reusable exercise cards, modals in `templates/includes/`
+- **Icons**: Bootstrap Icons with FontAwesome for brand icons
+
+**For Contributors**:
+- Use semantic CSS classes from [custom.css](app/static/css/custom.css)
+- Follow button sizing standards (`.btn-lg` for primary actions, `.btn` for secondary, `.btn-sm` for compact)
+- Apply `.btn-touch` to all interactive buttons for mobile accessibility
+- Use component includes rather than duplicating code
+- Reference the design system documentation for color palette and component patterns
 
 ### Running Tests
 ```bash

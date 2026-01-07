@@ -5,12 +5,12 @@
 {% block content %}
 <div class="container">
     <h1 class="mb-4">
-        <i class="bi bi-speedometer2"></i> Dashboard
+        <i class="fa-solid fa-gauge"></i> Dashboard
     </h1>
 
     <!-- Welcome message -->
     <div class="alert alert-info">
-        <h4><i class="bi bi-person-circle"></i> Welcome, {{ current_user.username }}!</h4>
+        <h4><i class="fa-solid fa-circle-user"></i> Welcome, {{ current_user.username }}!</h4>
         <p class="mb-0">Track your workouts, log your progress, and achieve your fitness goals.</p>
     </div>
 
@@ -19,7 +19,7 @@
         <div class="col-md-4 mb-3">
             <div class="card bg-primary text-white">
                 <div class="card-body">
-                    <h5 class="card-title"><i class="bi bi-calendar-check"></i> Total Workouts</h5>
+                    <h5 class="card-title"><i class="fa-solid fa-calendar-check"></i> Total Workouts</h5>
                     <h2 class="mb-0">{{ total_workouts }}</h2>
                 </div>
             </div>
@@ -27,7 +27,7 @@
         <div class="col-md-4 mb-3">
             <div class="card bg-success text-white">
                 <div class="card-body">
-                    <h5 class="card-title"><i class="bi bi-check-circle"></i> Completed</h5>
+                    <h5 class="card-title"><i class="fa-solid fa-circle-check"></i> Completed</h5>
                     <h2 class="mb-0">{{ completed_workouts }}</h2>
                 </div>
             </div>
@@ -35,7 +35,7 @@
         <div class="col-md-4 mb-3">
             <div class="card bg-info text-white">
                 <div class="card-body">
-                    <h5 class="card-title"><i class="bi bi-list-ul"></i> Exercises Available</h5>
+                    <h5 class="card-title"><i class="fa-solid fa-list-ul"></i> Exercises Available</h5>
                     <h2 class="mb-0">{{ total_exercises }}</h2>
                 </div>
             </div>
@@ -47,11 +47,11 @@
         <div class="col-md-6 mb-3">
             <div class="card shadow">
                 <div class="card-body text-center">
-                    <i class="bi bi-plus-circle display-4 text-primary"></i>
+                    <i class="fa-solid fa-circle-plus display-4 text-primary"></i>
                     <h5 class="card-title mt-2">Create New Workout</h5>
                     <p class="card-text">Plan your next gym session</p>
                     <a href="{{ url_for('workouts.create') }}" class="btn btn-primary btn-lg btn-touch">
-                        <i class="bi bi-plus"></i> New Workout
+                        <i class="fa-solid fa-plus"></i> New Workout
                     </a>
                 </div>
             </div>
@@ -59,11 +59,11 @@
         <div class="col-md-6 mb-3">
             <div class="card shadow">
                 <div class="card-body text-center">
-                    <i class="bi bi-search display-4 text-info"></i>
+                    <i class="fa-solid fa-magnifying-glass display-4 text-info"></i>
                     <h5 class="card-title mt-2">Browse Exercises</h5>
                     <p class="card-text">Explore {{ total_exercises }} exercises</p>
                     <a href="{{ url_for('exercises.browse') }}" class="btn btn-info btn-lg btn-touch">
-                        <i class="bi bi-list-ul"></i> Browse Exercises
+                        <i class="fa-solid fa-list-ul"></i> Browse Exercises
                     </a>
                 </div>
             </div>
@@ -76,7 +76,7 @@
             <div class="card shadow">
                 <div class="card-body">
                     <h5 class="card-title">
-                        <i class="bi bi-strava" style="color: #FC4C02;"></i> Strava Integration
+                        <i class="fa-brands fa-strava strava-brand"></i> Strava Integration
                     </h5>
                     {% if strava_connected %}
                         <p class="mb-2">
@@ -86,15 +86,15 @@
                             {% endif %}
                         </p>
                         <p class="text-muted small mb-2">Upload your completed workouts to Strava from the workout detail page.</p>
-                        <form method="POST" action="{{ url_for('strava.disconnect') }}" style="display: inline;">
-                            <button type="submit" class="btn btn-sm btn-outline-danger" onclick="return confirm('Are you sure you want to disconnect Strava?');">
-                                <i class="bi bi-x-circle"></i> Disconnect
+                        <form method="POST" action="{{ url_for('strava.disconnect') }}">
+                            <button type="submit" class="btn btn-outline-danger btn-touch" onclick="return confirm('Are you sure you want to disconnect Strava?');">
+                                <i class="fa-solid fa-circle-xmark"></i> Disconnect
                             </button>
                         </form>
                     {% else %}
                         <p class="text-muted mb-2">Connect your Strava account to automatically upload completed workouts as weight training activities.</p>
-                        <a href="{{ url_for('strava.connect') }}" class="btn btn-sm btn-primary">
-                            <i class="bi bi-link-45deg"></i> Connect Strava
+                        <a href="{{ url_for('strava.connect') }}" class="btn btn-strava btn-touch">
+                            <i class="fa-solid fa-link strava-brand"></i> Connect Strava
                         </a>
                     {% endif %}
                 </div>
@@ -108,13 +108,13 @@
             <div class="card shadow">
                 <div class="card-body">
                     <h5 class="card-title">
-                        <i class="bi bi-bookmark-star"></i> Workout Templates
+                        <i class="fa-solid fa-bookmark"></i> Workout Templates
                     </h5>
                     <p class="text-muted mb-2">
                         Create reusable workout plans to save time
                     </p>
-                    <a href="{{ url_for('templates.list') }}" class="btn btn-sm btn-primary">
-                        <i class="bi bi-bookmarks"></i> Manage Templates
+                    <a href="{{ url_for('templates.list') }}" class="btn btn-primary btn-touch">
+                        <i class="fa-solid fa-bookmark"></i> Manage Templates
                     </a>
                 </div>
             </div>
@@ -124,7 +124,7 @@
     <!-- Today's workouts -->
     <div class="row mb-4">
         <div class="col-12">
-            <h3><i class="bi bi-calendar-day"></i> Today's Workouts ({{ today.strftime('%B %d, %Y') }})</h3>
+            <h3><i class="fa-solid fa-calendar-day"></i> Today's Workouts ({{ today.strftime('%B %d, %Y') }})</h3>
             {% if todays_workouts %}
                 <div class="list-group">
                     {% for workout in todays_workouts %}
@@ -136,14 +136,14 @@
                                 </span>
                             </div>
                             {% if workout.scheduled_time %}
-                                <p class="mb-1"><i class="bi bi-clock"></i> {{ workout.scheduled_time }}</p>
+                                <p class="mb-1"><i class="fa-solid fa-clock"></i> {{ workout.scheduled_time }}</p>
                             {% endif %}
                         </a>
                     {% endfor %}
                 </div>
             {% else %}
                 <div class="alert alert-secondary">
-                    <i class="bi bi-info-circle"></i> No workouts scheduled for today.
+                    <i class="fa-solid fa-circle-info"></i> No workouts scheduled for today.
                     <a href="{{ url_for('workouts.create') }}" class="alert-link">Create one now</a>
                 </div>
             {% endif %}
@@ -153,7 +153,7 @@
     <!-- Recent workouts -->
     <div class="row">
         <div class="col-12">
-            <h3><i class="bi bi-clock-history"></i> Recent Workouts</h3>
+            <h3><i class="fa-solid fa-clock-rotate-left"></i> Recent Workouts</h3>
             {% if recent_workouts %}
                 <div class="list-group">
                     {% for workout in recent_workouts %}
@@ -165,8 +165,8 @@
                                 </span>
                             </div>
                             <p class="mb-1">
-                                <i class="bi bi-calendar"></i> {{ workout.scheduled_date }}
-                                {% if workout.scheduled_time %}- <i class="bi bi-clock"></i> {{ workout.scheduled_time }}{% endif %}
+                                <i class="fa-solid fa-calendar"></i> {{ workout.scheduled_date }}
+                                {% if workout.scheduled_time %}- <i class="fa-solid fa-clock"></i> {{ workout.scheduled_time }}{% endif %}
                             </p>
                         </a>
                     {% endfor %}
@@ -176,7 +176,7 @@
                 </div>
             {% else %}
                 <div class="alert alert-secondary">
-                    <i class="bi bi-info-circle"></i> No workouts yet.
+                    <i class="fa-solid fa-circle-info"></i> No workouts yet.
                     <a href="{{ url_for('workouts.create') }}" class="alert-link">Create your first workout</a>
                 </div>
             {% endif %}

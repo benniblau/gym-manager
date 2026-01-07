@@ -5,7 +5,7 @@
 {% block content %}
 <div class="container">
     <div class="d-flex justify-content-between align-items-center mb-3">
-        <h2><i class="bi bi-play-fill"></i> {{ workout.name }}</h2>
+        <h2><i class="fa-solid fa-play"></i> {{ workout.name }}</h2>
         <span class="badge bg-{{ 'success' if workout.status == 'completed' else ('warning' if workout.status == 'in_progress' else 'secondary') }} fs-6">
             {{ workout.status }}
         </span>
@@ -13,13 +13,13 @@
 
     {% if workout.status == 'completed' %}
         <div class="alert alert-success">
-            <i class="bi bi-check-circle"></i> This workout is completed!
+            <i class="fa-solid fa-circle-check"></i> This workout is completed!
         </div>
     {% endif %}
 
     {% if not exercises %}
         <div class="alert alert-warning">
-            <h5><i class="bi bi-exclamation-triangle"></i> No exercises in this workout</h5>
+            <h5><i class="fa-solid fa-triangle-exclamation"></i> No exercises in this workout</h5>
             <p class="mb-0">
                 <a href="{{ url_for('workouts.edit', workout_id=workout.id) }}" class="alert-link">Add some exercises first</a>
             </p>
@@ -28,7 +28,7 @@
         <!-- Progress indicator -->
         <div class="mb-3">
             <small class="text-muted">Exercise {{ exercises|length }} total</small>
-            <div class="progress" style="height: 5px;">
+            <div class="progress progress-thin">
                 <div class="progress-bar bg-success" role="progressbar" style="width: 0%" id="progress-bar"></div>
             </div>
         </div>
@@ -36,7 +36,7 @@
         <!-- Exercise cards -->
         <form method="POST" id="workout-form">
             {% for exercise in exercises %}
-                <div class="card exercise-card mb-3 shadow">
+                <div class="card exercise-log-card mb-3 shadow">
                     <div class="card-header bg-primary text-white">
                         <h5 class="mb-0">
                             {{ loop.index }}. {{ exercise.exercise_name }}
@@ -52,13 +52,24 @@
                         {% endif %}
                     </div>
                     <div class="card-body">
+                        <!-- Exercise metadata badges -->
+                        <div class="exercise-log-meta mb-3">
+                            {% if exercise.category_name %}
+                                <span class="badge badge-category">{{ exercise.category_name }}</span>
+                            {% endif %}
+                            {% if exercise.primary_muscles %}
+                                <span class="badge badge-muscle-primary">
+                                    <i class="fa-solid fa-heart-pulse"></i> {{ exercise.primary_muscles }}
+                                </span>
+                            {% endif %}
+                        </div>
                         <div class="row g-3">
                             <!-- Sets input -->
                             <div class="col-6 col-md-3">
                                 <label for="sets_{{ exercise.id }}" class="form-label fw-bold">Sets</label>
                                 <div class="input-group input-group-stepper">
                                     <button type="button" class="btn btn-outline-secondary btn-touch stepper-minus" data-target="sets_{{ exercise.id }}">
-                                        <i class="bi bi-dash-lg"></i>
+                                        <i class="fa-solid fa-minus"></i>
                                     </button>
                                     <input type="number"
                                            class="form-control form-control-lg text-center auto-save"
@@ -70,7 +81,7 @@
                                            data-field="actual_sets"
                                            placeholder="{{ exercise.target_sets or '' }}">
                                     <button type="button" class="btn btn-outline-secondary btn-touch stepper-plus" data-target="sets_{{ exercise.id }}">
-                                        <i class="bi bi-plus-lg"></i>
+                                        <i class="fa-solid fa-plus"></i>
                                     </button>
                                 </div>
                             </div>
@@ -80,7 +91,7 @@
                                 <label for="reps_{{ exercise.id }}" class="form-label fw-bold">Reps</label>
                                 <div class="input-group input-group-stepper">
                                     <button type="button" class="btn btn-outline-secondary btn-touch stepper-minus" data-target="reps_{{ exercise.id }}">
-                                        <i class="bi bi-dash-lg"></i>
+                                        <i class="fa-solid fa-minus"></i>
                                     </button>
                                     <input type="number"
                                            class="form-control form-control-lg text-center auto-save"
@@ -92,7 +103,7 @@
                                            data-field="actual_reps"
                                            placeholder="{{ exercise.target_reps or '' }}">
                                     <button type="button" class="btn btn-outline-secondary btn-touch stepper-plus" data-target="reps_{{ exercise.id }}">
-                                        <i class="bi bi-plus-lg"></i>
+                                        <i class="fa-solid fa-plus"></i>
                                     </button>
                                 </div>
                             </div>
@@ -102,7 +113,7 @@
                                 <label for="weight_{{ exercise.id }}" class="form-label fw-bold">Weight (kg)</label>
                                 <div class="input-group input-group-stepper">
                                     <button type="button" class="btn btn-outline-secondary btn-touch stepper-minus" data-target="weight_{{ exercise.id }}" data-step="5">
-                                        <i class="bi bi-dash-lg"></i>
+                                        <i class="fa-solid fa-minus"></i>
                                     </button>
                                     <input type="number"
                                            class="form-control form-control-lg text-center auto-save"
@@ -114,7 +125,7 @@
                                            data-field="actual_weight"
                                            placeholder="{{ exercise.target_weight or '' }}">
                                     <button type="button" class="btn btn-outline-secondary btn-touch stepper-plus" data-target="weight_{{ exercise.id }}" data-step="5">
-                                        <i class="bi bi-plus-lg"></i>
+                                        <i class="fa-solid fa-plus"></i>
                                     </button>
                                 </div>
                             </div>
@@ -124,7 +135,7 @@
                                 <label for="duration_{{ exercise.id }}" class="form-label fw-bold">Duration (s)</label>
                                 <div class="input-group input-group-stepper">
                                     <button type="button" class="btn btn-outline-secondary btn-touch stepper-minus" data-target="duration_{{ exercise.id }}" data-step="5">
-                                        <i class="bi bi-dash-lg"></i>
+                                        <i class="fa-solid fa-minus"></i>
                                     </button>
                                     <input type="number"
                                            class="form-control form-control-lg text-center auto-save"
@@ -136,7 +147,7 @@
                                            data-field="actual_duration"
                                            placeholder="{{ exercise.target_duration or '' }}">
                                     <button type="button" class="btn btn-outline-secondary btn-touch stepper-plus" data-target="duration_{{ exercise.id }}" data-step="5">
-                                        <i class="bi bi-plus-lg"></i>
+                                        <i class="fa-solid fa-plus"></i>
                                     </button>
                                 </div>
                             </div>
@@ -145,7 +156,7 @@
                         <!-- Save indicator -->
                         <div class="text-center mt-2">
                             <small class="text-muted save-status" id="status-{{ exercise.id }}">
-                                <i class="bi bi-cloud-check text-success"></i> Auto-save enabled
+                                <i class="fa-solid fa-cloud-arrow-up text-success"></i> Auto-save enabled
                             </small>
                         </div>
 
@@ -155,12 +166,12 @@
                                     class="btn btn-sm btn-outline-info flex-fill view-exercise-details"
                                     data-exercise-id="{{ exercise.exercise_id }}"
                                     data-exercise-name="{{ exercise.exercise_name }}">
-                                <i class="bi bi-info-circle"></i> Instructions
+                                <i class="fa-solid fa-circle-info"></i> Instructions
                             </button>
                             <a href="{{ exercise.exercise_name | exercem_url }}"
                                class="btn btn-sm btn-outline-success flex-fill"
                                target="_blank">
-                                <i class="bi bi-link-45deg"></i> exercem.us
+                                <i class="fa-solid fa-link"></i> exercem.us
                             </a>
                         </div>
                     </div>
@@ -173,315 +184,16 @@
             {% if workout.status != 'completed' %}
                 <form method="POST" action="{{ url_for('workouts.complete', workout_id=workout.id) }}">
                     <button type="submit" class="btn btn-success btn-lg btn-touch w-100">
-                        <i class="bi bi-check-circle"></i> Complete Workout
+                        <i class="fa-solid fa-circle-check"></i> Complete Workout
                     </button>
                 </form>
             {% endif %}
             <a href="{{ url_for('workouts.detail', workout_id=workout.id) }}" class="btn btn-outline-secondary btn-lg btn-touch">
-                <i class="bi bi-arrow-left"></i> Back to Workout
+                <i class="fa-solid fa-arrow-left"></i> Back to Workout
             </a>
         </div>
     {% endif %}
 </div>
 
-<!-- Exercise Details Modal -->
-<div class="modal fade" id="exerciseDetailsModal" tabindex="-1">
-    <div class="modal-dialog modal-lg">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title" id="details-exercise-name"></h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-            </div>
-            <div class="modal-body">
-                <!-- Loading state -->
-                <div id="details-loading" class="text-center py-4">
-                    <div class="spinner-border text-primary" role="status">
-                        <span class="visually-hidden">Loading...</span>
-                    </div>
-                </div>
-
-                <!-- Content (hidden initially) -->
-                <div id="details-content" style="display: none;">
-                    <!-- Category and muscles -->
-                    <div class="mb-3">
-                        <span class="badge bg-primary me-2" id="details-category"></span>
-                        <span class="badge bg-secondary" id="details-muscles"></span>
-                    </div>
-
-                    <!-- Description -->
-                    <div class="mb-3" id="details-description-container">
-                        <h6>Description</h6>
-                        <p id="details-description" class="text-muted"></p>
-                    </div>
-
-                    <!-- Images -->
-                    <div class="mb-3" id="details-images-container" style="display: none;">
-                        <h6>Illustrations</h6>
-                        <div class="row">
-                            <div class="col-md-6 mb-2" id="details-image1-container" style="display: none;">
-                                <img id="details-image1" class="img-fluid rounded" alt="Exercise illustration 1">
-                            </div>
-                            <div class="col-md-6 mb-2" id="details-image2-container" style="display: none;">
-                                <img id="details-image2" class="img-fluid rounded" alt="Exercise illustration 2">
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Instructions -->
-                    <div class="mb-3" id="details-instructions-container" style="display: none;">
-                        <h6>Instructions</h6>
-                        <ol id="details-instructions"></ol>
-                    </div>
-
-                    <!-- Equipment -->
-                    <div class="mb-3" id="details-equipment-container" style="display: none;">
-                        <h6>Equipment</h6>
-                        <p id="details-equipment"></p>
-                    </div>
-
-                    <!-- External links -->
-                    <div class="mb-3">
-                        <h6>External Resources</h6>
-                        <div class="d-flex gap-2">
-                            <a id="details-video-link" href="#" target="_blank" class="btn btn-sm btn-outline-danger" style="display: none;">
-                                <i class="bi bi-youtube"></i> Watch Video
-                            </a>
-                            <a id="details-exercem-link" href="#" target="_blank" class="btn btn-sm btn-outline-success">
-                                <i class="bi bi-link-45deg"></i> exercem.us
-                            </a>
-                            <a id="details-garmin-link" href="#" target="_blank" class="btn btn-sm btn-outline-primary" style="display: none;">
-                                <i class="bi bi-link-45deg"></i> Garmin Connect
-                            </a>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Error state -->
-                <div id="details-error" class="alert alert-danger" style="display: none;">
-                    Failed to load exercise details.
-                </div>
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
-            </div>
-        </div>
-    </div>
-</div>
-{% endblock %}
-
-{% block extra_js %}
-<script>
-const workoutId = {{ workout.id }};
-let saveTimeout;
-
-// Stepper buttons functionality
-document.querySelectorAll('.stepper-plus').forEach(btn => {
-    btn.addEventListener('click', function() {
-        const targetId = this.dataset.target;
-        const input = document.getElementById(targetId);
-        const step = parseFloat(this.dataset.step || 1);
-        const currentValue = parseFloat(input.value) || 0;
-        const max = parseFloat(input.max);
-        const newValue = currentValue + step;
-
-        if (!max || newValue <= max) {
-            input.value = newValue;
-            input.dispatchEvent(new Event('change'));
-        }
-    });
-});
-
-document.querySelectorAll('.stepper-minus').forEach(btn => {
-    btn.addEventListener('click', function() {
-        const targetId = this.dataset.target;
-        const input = document.getElementById(targetId);
-        const step = parseFloat(this.dataset.step || 1);
-        const currentValue = parseFloat(input.value) || 0;
-        const min = parseFloat(input.min) || 0;
-        const newValue = currentValue - step;
-
-        if (newValue >= min) {
-            input.value = newValue;
-            input.dispatchEvent(new Event('change'));
-        }
-    });
-});
-
-// Auto-save functionality
-document.querySelectorAll('.auto-save').forEach(input => {
-    input.addEventListener('change', function() {
-        clearTimeout(saveTimeout);
-        const exerciseId = this.dataset.exerciseId;
-        const statusEl = document.getElementById(`status-${exerciseId}`);
-
-        // Show saving indicator
-        statusEl.innerHTML = '<i class="bi bi-cloud-arrow-up text-warning"></i> Saving...';
-
-        saveTimeout = setTimeout(async () => {
-            try {
-                const formData = new FormData();
-                const setsInput = document.getElementById(`sets_${exerciseId}`);
-                const repsInput = document.getElementById(`reps_${exerciseId}`);
-                const weightInput = document.getElementById(`weight_${exerciseId}`);
-                const durationInput = document.getElementById(`duration_${exerciseId}`);
-
-                if (setsInput.value) formData.append('actual_sets', setsInput.value);
-                if (repsInput.value) formData.append('actual_reps', repsInput.value);
-                if (weightInput.value) formData.append('actual_weight', weightInput.value);
-                if (durationInput.value) formData.append('actual_duration', durationInput.value);
-
-                const response = await fetch(`/workouts/${workoutId}/exercises/${exerciseId}/update`, {
-                    method: 'POST',
-                    body: formData
-                });
-
-                const data = await response.json();
-
-                if (data.success) {
-                    statusEl.innerHTML = '<i class="bi bi-cloud-check text-success"></i> Saved!';
-                    updateProgress();
-
-                    // Reset to auto-save message after 2 seconds
-                    setTimeout(() => {
-                        statusEl.innerHTML = '<i class="bi bi-cloud-check text-success"></i> Auto-save enabled';
-                    }, 2000);
-                } else {
-                    statusEl.innerHTML = '<i class="bi bi-exclamation-triangle text-danger"></i> Failed to save';
-                }
-            } catch (error) {
-                console.error('Error saving:', error);
-                statusEl.innerHTML = '<i class="bi bi-exclamation-triangle text-danger"></i> Error saving';
-            }
-        }, 500); // Debounce for 500ms
-    });
-});
-
-// Update progress bar
-function updateProgress() {
-    const inputs = document.querySelectorAll('.auto-save');
-    let filledInputs = 0;
-
-    inputs.forEach(input => {
-        if (input.value) filledInputs++;
-    });
-
-    const percentage = (filledInputs / inputs.length) * 100;
-    document.getElementById('progress-bar').style.width = percentage + '%';
-}
-
-// Initialize progress on load
-updateProgress();
-
-// Exercise details modal
-document.querySelectorAll('.view-exercise-details').forEach(button => {
-    button.addEventListener('click', async function() {
-        const exerciseId = this.getAttribute('data-exercise-id');
-        const exerciseName = this.getAttribute('data-exercise-name');
-
-        // Show modal
-        const modal = new bootstrap.Modal(document.getElementById('exerciseDetailsModal'));
-        modal.show();
-
-        // Reset modal state
-        document.getElementById('details-exercise-name').textContent = exerciseName;
-        document.getElementById('details-loading').style.display = 'block';
-        document.getElementById('details-content').style.display = 'none';
-        document.getElementById('details-error').style.display = 'none';
-
-        try {
-            // Fetch exercise details
-            const response = await fetch(`/exercises/${exerciseId}/details`);
-            const data = await response.json();
-
-            if (data.error) {
-                throw new Error(data.error);
-            }
-
-            // Hide loading, show content
-            document.getElementById('details-loading').style.display = 'none';
-            document.getElementById('details-content').style.display = 'block';
-
-            // Populate modal with data
-            document.getElementById('details-category').textContent = data.category_name || '';
-            document.getElementById('details-muscles').textContent = data.primary_muscles || '';
-            document.getElementById('details-description').textContent = data.description || 'No description available';
-
-            // Images
-            const imagesContainer = document.getElementById('details-images-container');
-            const image1Container = document.getElementById('details-image1-container');
-            const image2Container = document.getElementById('details-image2-container');
-
-            let hasImages = false;
-            if (data.image1_url) {
-                document.getElementById('details-image1').src = data.image1_url;
-                image1Container.style.display = 'block';
-                hasImages = true;
-            } else {
-                image1Container.style.display = 'none';
-            }
-
-            if (data.image2_url) {
-                document.getElementById('details-image2').src = data.image2_url;
-                image2Container.style.display = 'block';
-                hasImages = true;
-            } else {
-                image2Container.style.display = 'none';
-            }
-
-            imagesContainer.style.display = hasImages ? 'block' : 'none';
-
-            // Instructions
-            const instructionsContainer = document.getElementById('details-instructions-container');
-            const instructionsList = document.getElementById('details-instructions');
-            if (data.instructions && data.instructions.length > 0) {
-                instructionsList.innerHTML = '';
-                data.instructions.forEach(instruction => {
-                    const li = document.createElement('li');
-                    li.textContent = instruction;
-                    instructionsList.appendChild(li);
-                });
-                instructionsContainer.style.display = 'block';
-            } else {
-                instructionsContainer.style.display = 'none';
-            }
-
-            // Equipment
-            const equipmentContainer = document.getElementById('details-equipment-container');
-            if (data.equipment && data.equipment.length > 0) {
-                document.getElementById('details-equipment').textContent = data.equipment.join(', ');
-                equipmentContainer.style.display = 'block';
-            } else {
-                equipmentContainer.style.display = 'none';
-            }
-
-            // External links
-            const videoLink = document.getElementById('details-video-link');
-            if (data.video) {
-                videoLink.href = data.video;
-                videoLink.style.display = 'inline-block';
-            } else {
-                videoLink.style.display = 'none';
-            }
-
-            // Exercem link
-            const exercemLink = document.getElementById('details-exercem-link');
-            exercemLink.href = `https://exercem.us/exercises/${encodeURIComponent(data.name.toLowerCase().replace(/ /g, '-'))}`;
-
-            // Garmin link
-            const garminLink = document.getElementById('details-garmin-link');
-            if (data.garmin_url) {
-                garminLink.href = data.garmin_url;
-                garminLink.style.display = 'inline-block';
-            } else {
-                garminLink.style.display = 'none';
-            }
-
-        } catch (error) {
-            console.error('Error fetching exercise details:', error);
-            document.getElementById('details-loading').style.display = 'none';
-            document.getElementById('details-error').style.display = 'block';
-        }
-    });
-});
-</script>
+{% include 'includes/exercise_details_modal.html' %}
 {% endblock %}

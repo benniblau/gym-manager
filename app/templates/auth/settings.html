@@ -4,14 +4,14 @@
 
 {% block content %}
 <div class="container">
-    <h1 class="mb-4"><i class="bi bi-gear"></i> Account Settings</h1>
+    <h1 class="mb-4"><i class="fa-solid fa-gear"></i> Account Settings</h1>
 
     <div class="row">
         <!-- Account Information -->
         <div class="col-md-6 mb-4">
             <div class="card">
                 <div class="card-header">
-                    <h5 class="mb-0"><i class="bi bi-person-circle"></i> Account Information</h5>
+                    <h5 class="mb-0"><i class="fa-solid fa-circle-user"></i> Account Information</h5>
                 </div>
                 <div class="card-body">
                     <div class="mb-3">
@@ -35,12 +35,12 @@
         <div class="col-md-6 mb-4">
             <div class="card">
                 <div class="card-header">
-                    <h5 class="mb-0"><i class="bi bi-strava"></i> Strava Integration</h5>
+                    <h5 class="mb-0"><i class="fa-brands fa-strava strava-brand"></i> Strava Integration</h5>
                 </div>
                 <div class="card-body">
                     {% if strava_connection %}
-                        <div class="alert alert-success mb-3">
-                            <i class="bi bi-check-circle"></i> Connected to Strava
+                        <div class="alert alert-strava mb-3">
+                            <i class="fa-solid fa-circle-check"></i> Connected to Strava
                         </div>
                         <div class="mb-3">
                             <label class="form-label fw-bold">Athlete ID</label>
@@ -58,16 +58,16 @@
                         </div>
                         <form method="POST" action="{{ url_for('strava.disconnect') }}" onsubmit="return confirm('Are you sure you want to disconnect Strava? You will need to reconnect to upload workouts.')">
                             <button type="submit" class="btn btn-danger btn-lg btn-touch w-100">
-                                <i class="bi bi-x-circle"></i> Disconnect Strava
+                                <i class="fa-solid fa-circle-xmark"></i> Disconnect Strava
                             </button>
                         </form>
                     {% else %}
                         <div class="alert alert-info mb-3">
-                            <i class="bi bi-info-circle"></i> Not connected to Strava
+                            <i class="fa-solid fa-circle-info"></i> Not connected to Strava
                         </div>
                         <p class="mb-3">Connect your Strava account to automatically upload your completed workouts.</p>
-                        <a href="{{ url_for('strava.connect') }}" class="btn btn-success btn-lg btn-touch w-100">
-                            <i class="bi bi-link-45deg"></i> Connect to Strava
+                        <a href="{{ url_for('strava.connect') }}" class="btn btn-strava btn-lg btn-touch w-100">
+                            <i class="fa-solid fa-link strava-brand"></i> Connect to Strava
                         </a>
                     {% endif %}
                 </div>
@@ -78,7 +78,7 @@
     <!-- Update Email -->
     <div class="card mb-4">
         <div class="card-header">
-            <h5 class="mb-0"><i class="bi bi-envelope"></i> Update Email</h5>
+            <h5 class="mb-0"><i class="fa-solid fa-envelope"></i> Update Email</h5>
         </div>
         <div class="card-body">
             <form method="POST" action="{{ url_for('auth.update_email') }}">
@@ -119,7 +119,7 @@
     <!-- Update Password -->
     <div class="card mb-4">
         <div class="card-header">
-            <h5 class="mb-0"><i class="bi bi-key"></i> Update Password</h5>
+            <h5 class="mb-0"><i class="fa-solid fa-key"></i> Update Password</h5>
         </div>
         <div class="card-body">
             <form method="POST" action="{{ url_for('auth.update_password') }}">
@@ -171,11 +171,11 @@
     <!-- Manual Strava Credentials Update -->
     <div class="card mb-4">
         <div class="card-header">
-            <h5 class="mb-0"><i class="bi bi-key-fill"></i> Manual Strava Credentials</h5>
+            <h5 class="mb-0"><i class="fa-solid fa-key"></i> Manual Strava Credentials</h5>
         </div>
         <div class="card-body">
             <div class="alert alert-warning">
-                <i class="bi bi-exclamation-triangle"></i> <strong>Advanced:</strong> Only use this if you have manually obtained Strava API tokens. Incorrect values may break Strava integration.
+                <i class="fa-solid fa-triangle-exclamation"></i> <strong>Advanced:</strong> Only use this if you have manually obtained Strava API tokens. Incorrect values may break Strava integration.
             </div>
 
             <form method="POST" action="{{ url_for('auth.update_strava_credentials') }}">
@@ -244,7 +244,7 @@
                 </div>
 
                 <div class="d-grid">
-                    {{ strava_form.submit(class="btn btn-warning btn-lg btn-touch") }}
+                    {{ strava_form.submit(class="btn btn-strava btn-lg btn-touch") }}
                 </div>
             </form>
         </div>
@@ -253,18 +253,18 @@
     <!-- Account Actions -->
     <div class="card border-danger mb-4">
         <div class="card-header bg-danger text-white">
-            <h5 class="mb-0"><i class="bi bi-exclamation-triangle"></i> Danger Zone</h5>
+            <h5 class="mb-0"><i class="fa-solid fa-triangle-exclamation"></i> Danger Zone</h5>
         </div>
         <div class="card-body">
             <p class="mb-3">Once you delete your account, there is no going back. This will permanently delete all your workouts, templates, and exercise logs.</p>
             <button type="button" class="btn btn-outline-danger" disabled>
-                <i class="bi bi-trash"></i> Delete Account (Coming Soon)
+                <i class="fa-solid fa-trash"></i> Delete Account (Coming Soon)
             </button>
         </div>
     </div>
 
-    <a href="{{ url_for('main.dashboard') }}" class="btn btn-outline-secondary mb-4">
-        <i class="bi bi-arrow-left"></i> Back to Dashboard
+    <a href="{{ url_for('main.dashboard') }}" class="btn btn-outline-secondary btn-touch mb-4">
+        <i class="fa-solid fa-arrow-left"></i> Back to Dashboard
     </a>
 </div>
 {% endblock %}

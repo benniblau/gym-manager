@@ -5,9 +5,9 @@
 {% block content %}
 <div class="container">
     <div class="d-flex justify-content-between align-items-center mb-4">
-        <h1><i class="bi bi-calendar-check"></i> My Workouts</h1>
+        <h1><i class="fa-solid fa-calendar-check"></i> My Workouts</h1>
         <a href="{{ url_for('workouts.create') }}" class="btn btn-primary btn-lg btn-touch">
-            <i class="bi bi-plus"></i> New Workout
+            <i class="fa-solid fa-plus"></i> New Workout
         </a>
     </div>
 
@@ -23,9 +23,9 @@
                                 </a>
                             </h5>
                             <p class="mb-1">
-                                <i class="bi bi-calendar"></i> {{ workout.scheduled_date }}
+                                <i class="fa-solid fa-calendar"></i> {{ workout.scheduled_date }}
                                 {% if workout.scheduled_time %}
-                                    - <i class="bi bi-clock"></i> {{ workout.scheduled_time }}
+                                    - <i class="fa-solid fa-clock"></i> {{ workout.scheduled_time }}
                                 {% endif %}
                             </p>
                             {% if workout.notes %}
@@ -38,12 +38,12 @@
                             </span>
                             <br>
                             {% if workout.status != 'completed' %}
-                                <a href="{{ url_for('workouts.log', workout_id=workout.id) }}" class="btn btn-sm btn-primary">
-                                    <i class="bi bi-play-fill"></i> Log
+                                <a href="{{ url_for('workouts.log', workout_id=workout.id) }}" class="btn btn-primary btn-touch">
+                                    <i class="fa-solid fa-play"></i> Log
                                 </a>
                             {% endif %}
-                            <a href="{{ url_for('workouts.detail', workout_id=workout.id) }}" class="btn btn-sm btn-info">
-                                <i class="bi bi-eye"></i> View
+                            <a href="{{ url_for('workouts.detail', workout_id=workout.id) }}" class="btn btn-info btn-touch">
+                                <i class="fa-solid fa-eye"></i> View
                             </a>
                         </div>
                     </div>
@@ -52,7 +52,7 @@
         </div>
     {% else %}
         <div class="alert alert-info">
-            <h4><i class="bi bi-info-circle"></i> No workouts yet</h4>
+            <h4><i class="fa-solid fa-circle-info"></i> No workouts yet</h4>
             <p class="mb-0">
                 Create your first workout to start tracking your gym sessions.
                 <a href="{{ url_for('workouts.create') }}" class="alert-link">Create one now</a>

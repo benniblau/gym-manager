@@ -440,11 +440,18 @@ class WorkoutExercise:
         """Get all exercises for a workout with exercise details"""
         db = get_db()
         rows = db.execute('''
-            SELECT we.*, e.name as exercise_name, e.description as exercise_description, c.name as category_name
+            SELECT we.*,
+                   e.name as exercise_name,
+                   e.description as exercise_description,
+                   c.name as category_name,
+                   GROUP_CONCAT(m.name, ', ') as primary_muscles
             FROM workout_exercises we
             JOIN exercises e ON we.exercise_id = e.id
             LEFT JOIN categories c ON e.category_id = c.id
+            LEFT JOIN exercise_primary_muscles epm ON e.id = epm.exercise_id
+            LEFT JOIN muscles m ON epm.muscle_id = m.id
             WHERE we.workout_id = ?
+            GROUP BY we.id
             ORDER BY we.order_position
         ''', (workout_id,)).fetchall()
         return [dict(row) for row in rows]

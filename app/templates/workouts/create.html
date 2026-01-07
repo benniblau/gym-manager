@@ -11,7 +11,7 @@
             <div class="card mb-4 shadow-sm">
                 <div class="card-body">
                     <h5 class="card-title">
-                        <i class="bi bi-bookmark-star"></i> Start from Template
+                        <i class="fa-solid fa-bookmark"></i> Start from Template
                     </h5>
                     <p class="text-muted small mb-3">Quick access to your recent templates</p>
                     <div class="list-group">
@@ -19,18 +19,18 @@
                             <a href="{{ url_for('templates.use_template', template_id=template.id) }}"
                                class="list-group-item list-group-item-action d-flex justify-content-between align-items-center">
                                 <div>
-                                    <i class="bi bi-bookmark"></i> {{ template.name }}
+                                    <i class="fa-solid fa-bookmark"></i> {{ template.name }}
                                     <small class="text-muted d-block">
                                         {{ template.get_exercises()|length }} exercises
                                     </small>
                                 </div>
-                                <i class="bi bi-chevron-right"></i>
+                                <i class="fa-solid fa-chevron-right"></i>
                             </a>
                         {% endfor %}
                     </div>
                     <div class="mt-2">
-                        <a href="{{ url_for('templates.list') }}" class="btn btn-sm btn-outline-primary">
-                            <i class="bi bi-bookmarks"></i> View All Templates
+                        <a href="{{ url_for('templates.list') }}" class="btn btn-outline-primary btn-touch">
+                            <i class="fa-solid fa-bookmark"></i> View All Templates
                         </a>
                     </div>
                 </div>
@@ -44,7 +44,7 @@
             <div class="card shadow">
                 <div class="card-body">
                     <h2 class="card-title mb-4">
-                        <i class="bi bi-plus-circle"></i> Create New Workout
+                        <i class="fa-solid fa-circle-plus"></i> Create New Workout
                     </h2>
 
                     <form method="POST" action="{{ url_for('workouts.create') }}">
@@ -105,7 +105,7 @@
                                    name="is_template"
                                    onchange="toggleDateFields(this)">
                             <label class="form-check-label" for="is_template">
-                                <i class="bi bi-bookmark-star"></i> Save as template (reusable workout plan)
+                                <i class="fa-solid fa-bookmark"></i> Save as template (reusable workout plan)
                             </label>
                             <small class="form-text text-muted d-block">
                                 Templates can be used to quickly create scheduled workouts
@@ -114,7 +114,7 @@
 
                         <div class="d-grid gap-2">
                             {{ form.submit(class="btn btn-primary btn-lg btn-touch") }}
-                            <a href="{{ url_for('workouts.list') }}" class="btn btn-secondary">Cancel</a>
+                            <a href="{{ url_for('workouts.list') }}" class="btn btn-secondary btn-lg btn-touch">Cancel</a>
                         </div>
                     </form>
 

@@ -4,19 +4,19 @@
 
 {% block content %}
 <div class="container">
-    <h1 class="mb-4"><i class="bi bi-pencil"></i> Edit Workout</h1>
+    <h1 class="mb-4"><i class="fa-solid fa-pencil"></i> Edit Workout</h1>
 
     <!-- Edit Workout Name -->
     <div class="card mb-4">
         <div class="card-header">
-            <h5 class="mb-0"><i class="bi bi-card-heading"></i> Workout Name</h5>
+            <h5 class="mb-0"><i class="fa-solid fa-heading"></i> Workout Name</h5>
         </div>
         <div class="card-body">
             <form method="POST" action="{{ url_for('workouts.update_name', workout_id=workout.id) }}" id="name-form">
                 <div class="input-group">
                     <input type="text" class="form-control" name="name" id="workout-name" value="{{ workout.name }}" required maxlength="100">
                     <button type="submit" class="btn btn-primary">
-                        <i class="bi bi-check-lg"></i> Update Name
+                        <i class="fa-solid fa-check"></i> Update Name
                     </button>
                 </div>
             </form>
@@ -26,7 +26,7 @@
     <!-- Edit Start and End Times -->
     <div class="card mb-4">
         <div class="card-header">
-            <h5 class="mb-0"><i class="bi bi-clock"></i> Workout Times</h5>
+            <h5 class="mb-0"><i class="fa-solid fa-clock"></i> Workout Times</h5>
         </div>
         <div class="card-body">
             <form method="POST" action="{{ url_for('workouts.update_times', workout_id=workout.id) }}">
@@ -51,7 +51,7 @@
                     </div>
                 </div>
                 <button type="submit" class="btn btn-primary">
-                    <i class="bi bi-clock-history"></i> Update Times
+                    <i class="fa-solid fa-clock"></i> Update Times
                 </button>
             </form>
         </div>
@@ -60,7 +60,7 @@
     <!-- Edit Workout Notes -->
     <div class="card mb-4">
         <div class="card-header">
-            <h5 class="mb-0"><i class="bi bi-sticky"></i> Workout Notes</h5>
+            <h5 class="mb-0"><i class="fa-solid fa-note-sticky"></i> Workout Notes</h5>
         </div>
         <div class="card-body">
             <form method="POST" action="{{ url_for('workouts.update_notes', workout_id=workout.id) }}">
@@ -68,7 +68,7 @@
                     <textarea class="form-control" name="notes" id="workout-notes" rows="3" placeholder="Add notes about this workout...">{{ workout.notes or '' }}</textarea>
                 </div>
                 <button type="submit" class="btn btn-primary">
-                    <i class="bi bi-check-lg"></i> Update Notes
+                    <i class="fa-solid fa-check"></i> Update Notes
                 </button>
             </form>
         </div>
@@ -79,7 +79,7 @@
         <div class="col-md-6 mb-4">
             <div class="card">
                 <div class="card-header">
-                    <h5 class="mb-0"><i class="bi bi-list-check"></i> Current Exercises ({{ exercises|length }})</h5>
+                    <h5 class="mb-0"><i class="fa-solid fa-list-check"></i> Current Exercises ({{ exercises|length }})</h5>
                 </div>
                 <div class="card-body">
                     {% if exercises %}
@@ -102,14 +102,14 @@
                                                     data-direction="up"
                                                     {% if loop.first %}disabled{% endif %}
                                                     title="Move up">
-                                                <i class="bi bi-arrow-up"></i>
+                                                <i class="fa-solid fa-arrow-up"></i>
                                             </button>
                                             <button class="btn btn-sm btn-outline-secondary btn-touch reorder-exercise {% if loop.last %}disabled{% endif %}"
                                                     data-exercise-id="{{ exercise.id }}"
                                                     data-direction="down"
                                                     {% if loop.last %}disabled{% endif %}
                                                     title="Move down">
-                                                <i class="bi bi-arrow-down"></i>
+                                                <i class="fa-solid fa-arrow-down"></i>
                                             </button>
                                             <button class="btn btn-sm btn-primary btn-touch edit-exercise"
                                                     data-exercise-id="{{ exercise.id }}"
@@ -120,12 +120,12 @@
                                                     data-target-duration="{{ exercise.target_duration or '' }}"
                                                     data-notes="{{ exercise.notes or '' }}"
                                                     title="Edit">
-                                                <i class="bi bi-pencil"></i>
+                                                <i class="fa-solid fa-pencil"></i>
                                             </button>
                                             <button class="btn btn-sm btn-danger btn-touch remove-exercise"
                                                     data-exercise-id="{{ exercise.id }}"
                                                     title="Remove">
-                                                <i class="bi bi-trash"></i>
+                                                <i class="fa-solid fa-trash"></i>
                                             </button>
                                         </div>
                                     </div>
@@ -143,7 +143,7 @@
         <div class="col-md-6 mb-4">
             <div class="card">
                 <div class="card-header">
-                    <h5 class="mb-0"><i class="bi bi-plus-circle"></i> Add Exercises</h5>
+                    <h5 class="mb-0"><i class="fa-solid fa-circle-plus"></i> Add Exercises</h5>
                 </div>
                 <div class="card-body">
                     <!-- Search and filters -->
@@ -171,7 +171,7 @@
                     </div>
 
                     <!-- Exercise list -->
-                    <div id="exercise-list" style="max-height: 400px; overflow-y: auto;">
+                    <div id="exercise-list" class="exercise-list-scroll">
                         {% for exercise in all_exercises %}
                             <div class="card mb-2 exercise-item"
                                  data-category="{{ exercise.category }}"
@@ -187,13 +187,13 @@
                                                     data-exercise-id="{{ exercise.id }}"
                                                     data-exercise-name="{{ exercise.name }}"
                                                     title="View details">
-                                                <i class="bi bi-info-circle"></i>
+                                                <i class="fa-solid fa-circle-info"></i>
                                             </button>
                                             <button class="btn btn-sm btn-primary btn-touch add-exercise"
                                                     data-exercise-id="{{ exercise.id }}"
                                                     data-exercise-name="{{ exercise.name }}"
                                                     title="Add to workout">
-                                                <i class="bi bi-plus"></i>
+                                                <i class="fa-solid fa-plus"></i>
                                             </button>
                                         </div>
                                     </div>
@@ -208,95 +208,13 @@
 
     <div class="d-grid gap-2">
         <a href="{{ url_for('workouts.detail', workout_id=workout.id) }}" class="btn btn-success btn-lg btn-touch">
-            <i class="bi bi-check"></i> Done Editing
+            <i class="fa-solid fa-check"></i> Done Editing
         </a>
-        <a href="{{ url_for('workouts.list') }}" class="btn btn-outline-secondary">Back to Workouts</a>
+        <a href="{{ url_for('workouts.list') }}" class="btn btn-outline-secondary btn-touch">Back to Workouts</a>
     </div>
 </div>
 
-<!-- Exercise Details Modal -->
-<div class="modal fade" id="exerciseDetailsModal" tabindex="-1">
-    <div class="modal-dialog modal-lg">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title" id="details-exercise-name"></h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-            </div>
-            <div class="modal-body">
-                <!-- Loading state -->
-                <div id="details-loading" class="text-center py-4">
-                    <div class="spinner-border text-primary" role="status">
-                        <span class="visually-hidden">Loading...</span>
-                    </div>
-                </div>
-
-                <!-- Content (hidden initially) -->
-                <div id="details-content" style="display: none;">
-                    <!-- Category and muscles -->
-                    <div class="mb-3">
-                        <span class="badge bg-primary me-2" id="details-category"></span>
-                        <span class="badge bg-secondary" id="details-muscles"></span>
-                    </div>
-
-                    <!-- Description -->
-                    <div class="mb-3" id="details-description-container">
-                        <h6>Description</h6>
-                        <p id="details-description" class="text-muted"></p>
-                    </div>
-
-                    <!-- Images -->
-                    <div class="mb-3" id="details-images-container" style="display: none;">
-                        <h6>Illustrations</h6>
-                        <div class="row">
-                            <div class="col-md-6 mb-2" id="details-image1-container" style="display: none;">
-                                <img id="details-image1" class="img-fluid rounded" alt="Exercise illustration 1">
-                            </div>
-                            <div class="col-md-6 mb-2" id="details-image2-container" style="display: none;">
-                                <img id="details-image2" class="img-fluid rounded" alt="Exercise illustration 2">
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Instructions -->
-                    <div class="mb-3" id="details-instructions-container" style="display: none;">
-                        <h6>Instructions</h6>
-                        <ol id="details-instructions"></ol>
-                    </div>
-
-                    <!-- Equipment -->
-                    <div class="mb-3" id="details-equipment-container" style="display: none;">
-                        <h6>Equipment</h6>
-                        <p id="details-equipment"></p>
-                    </div>
-
-                    <!-- External links -->
-                    <div class="mb-3">
-                        <h6>External Resources</h6>
-                        <div class="d-flex gap-2">
-                            <a id="details-video-link" href="#" target="_blank" class="btn btn-sm btn-outline-danger" style="display: none;">
-                                <i class="bi bi-youtube"></i> Watch Video
-                            </a>
-                            <a id="details-exercem-link" href="#" target="_blank" class="btn btn-sm btn-outline-success">
-                                <i class="bi bi-link-45deg"></i> exercem.us
-                            </a>
-                            <a id="details-garmin-link" href="#" target="_blank" class="btn btn-sm btn-outline-primary" style="display: none;">
-                                <i class="bi bi-link-45deg"></i> Garmin Connect
-                            </a>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Error state -->
-                <div id="details-error" class="alert alert-danger" style="display: none;">
-                    Failed to load exercise details.
-                </div>
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
-            </div>
-        </div>
-    </div>
-</div>
+{% include 'includes/exercise_details_modal.html' %}
 {% endblock %}
 
 {% block extra_js %}
@@ -467,13 +385,13 @@ function updateExerciseList(exercises) {
                            class="text-success small"
                            target="_blank"
                            title="View on exercem.us">
-                            <i class="bi bi-link-45deg"></i> exercem.us
+                            <i class="fa-solid fa-link"></i> exercem.us
                         </a>
                     </div>
                     <button class="btn btn-sm btn-primary btn-touch add-exercise"
                             data-exercise-id="${exercise.id}"
                             data-exercise-name="${exercise.name}">
-                        <i class="bi bi-plus"></i> Add
+                        <i class="fa-solid fa-plus"></i> Add
                     </button>
                 </div>
             </div>

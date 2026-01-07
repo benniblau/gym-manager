@@ -1,0 +1,202 @@
+{# Shared Exercise Details Modal Component #}
+{# This modal displays detailed information about an exercise #}
+{# Usage: Add data-exercise-id and data-exercise-name attributes to trigger buttons with class .view-exercise-details #}
+
+<!-- Exercise Details Modal -->
+<div class="modal fade" id="exerciseDetailsModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="details-exercise-name"></h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <!-- Loading state -->
+                <div id="details-loading" class="text-center py-4">
+                    <div class="spinner-border text-primary" role="status">
+                        <span class="visually-hidden">Loading...</span>
+                    </div>
+                </div>
+
+                <!-- Content (hidden initially) -->
+                <div id="details-content" style="display: none;">
+                    <!-- Category and muscles -->
+                    <div class="mb-3">
+                        <span class="badge badge-category me-2" id="details-category"></span>
+                        <span class="badge badge-muscle-primary" id="details-muscles"></span>
+                    </div>
+
+                    <!-- Description -->
+                    <div class="mb-3" id="details-description-container">
+                        <h6>Description</h6>
+                        <p id="details-description" class="text-muted"></p>
+                    </div>
+
+                    <!-- Images -->
+                    <div class="mb-3" id="details-images-container" style="display: none;">
+                        <h6>Illustrations</h6>
+                        <div class="row">
+                            <div class="col-md-6 mb-2" id="details-image1-container" style="display: none;">
+                                <img id="details-image1" class="img-fluid rounded" alt="Exercise illustration 1">
+                            </div>
+                            <div class="col-md-6 mb-2" id="details-image2-container" style="display: none;">
+                                <img id="details-image2" class="img-fluid rounded" alt="Exercise illustration 2">
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Instructions -->
+                    <div class="mb-3" id="details-instructions-container" style="display: none;">
+                        <h6>Instructions</h6>
+                        <ol id="details-instructions"></ol>
+                    </div>
+
+                    <!-- Equipment -->
+                    <div class="mb-3" id="details-equipment-container" style="display: none;">
+                        <h6>Equipment</h6>
+                        <p id="details-equipment"></p>
+                    </div>
+
+                    <!-- External links -->
+                    <div class="mb-3">
+                        <h6>External Resources</h6>
+                        <div class="d-flex gap-2">
+                            <a id="details-video-link" href="#" target="_blank" class="btn btn-sm btn-outline-danger" style="display: none;">
+                                <i class="fa-brands fa-youtube"></i> Watch Video
+                            </a>
+                            <a id="details-exercem-link" href="#" target="_blank" class="btn btn-sm btn-outline-success">
+                                <i class="fa-solid fa-link"></i> exercem.us
+                            </a>
+                            <a id="details-garmin-link" href="#" target="_blank" class="btn btn-sm btn-outline-primary" style="display: none;">
+                                <i class="fa-solid fa-link"></i> Garmin Connect
+                            </a>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Error state -->
+                <div id="details-error" class="alert alert-danger" style="display: none;">
+                    Failed to load exercise details.
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// Exercise details modal initialization
+// Attaches click handlers to all elements with class .view-exercise-details
+document.querySelectorAll('.view-exercise-details').forEach(button => {
+    button.addEventListener('click', async function() {
+        const exerciseId = this.getAttribute('data-exercise-id');
+        const exerciseName = this.getAttribute('data-exercise-name');
+
+        // Show modal
+        const modal = new bootstrap.Modal(document.getElementById('exerciseDetailsModal'));
+        modal.show();
+
+        // Reset modal state
+        document.getElementById('details-exercise-name').textContent = exerciseName;
+        document.getElementById('details-loading').style.display = 'block';
+        document.getElementById('details-content').style.display = 'none';
+        document.getElementById('details-error').style.display = 'none';
+
+        try {
+            // Fetch exercise details from API
+            const response = await fetch(`/exercises/${exerciseId}/details`);
+            const data = await response.json();
+
+            if (data.error) {
+                throw new Error(data.error);
+            }
+
+            // Hide loading, show content
+            document.getElementById('details-loading').style.display = 'none';
+            document.getElementById('details-content').style.display = 'block';
+
+            // Populate modal with data
+            document.getElementById('details-category').textContent = data.category_name || '';
+            document.getElementById('details-muscles').textContent = data.primary_muscles || '';
+            document.getElementById('details-description').textContent = data.description || 'No description available';
+
+            // Images
+            const imagesContainer = document.getElementById('details-images-container');
+            const image1Container = document.getElementById('details-image1-container');
+            const image2Container = document.getElementById('details-image2-container');
+
+            let hasImages = false;
+            if (data.image1_url) {
+                document.getElementById('details-image1').src = data.image1_url;
+                image1Container.style.display = 'block';
+                hasImages = true;
+            } else {
+                image1Container.style.display = 'none';
+            }
+
+            if (data.image2_url) {
+                document.getElementById('details-image2').src = data.image2_url;
+                image2Container.style.display = 'block';
+                hasImages = true;
+            } else {
+                image2Container.style.display = 'none';
+            }
+
+            imagesContainer.style.display = hasImages ? 'block' : 'none';
+
+            // Instructions
+            const instructionsContainer = document.getElementById('details-instructions-container');
+            const instructionsList = document.getElementById('details-instructions');
+            if (data.instructions && data.instructions.length > 0) {
+                instructionsList.innerHTML = '';
+                data.instructions.forEach(instruction => {
+                    const li = document.createElement('li');
+                    li.textContent = instruction;
+                    instructionsList.appendChild(li);
+                });
+                instructionsContainer.style.display = 'block';
+            } else {
+                instructionsContainer.style.display = 'none';
+            }
+
+            // Equipment
+            const equipmentContainer = document.getElementById('details-equipment-container');
+            if (data.equipment && data.equipment.length > 0) {
+                document.getElementById('details-equipment').textContent = data.equipment.join(', ');
+                equipmentContainer.style.display = 'block';
+            } else {
+                equipmentContainer.style.display = 'none';
+            }
+
+            // External links
+            const videoLink = document.getElementById('details-video-link');
+            if (data.video) {
+                videoLink.href = data.video;
+                videoLink.style.display = 'inline-block';
+            } else {
+                videoLink.style.display = 'none';
+            }
+
+            // Exercem link
+            const exercemLink = document.getElementById('details-exercem-link');
+            exercemLink.href = `https://exercem.us/exercises/${encodeURIComponent(data.name.toLowerCase().replace(/ /g, '-'))}`;
+
+            // Garmin link
+            const garminLink = document.getElementById('details-garmin-link');
+            if (data.garmin_url) {
+                garminLink.href = data.garmin_url;
+                garminLink.style.display = 'inline-block';
+            } else {
+                garminLink.style.display = 'none';
+            }
+
+        } catch (error) {
+            console.error('Error fetching exercise details:', error);
+            document.getElementById('details-loading').style.display = 'none';
+            document.getElementById('details-error').style.display = 'block';
+        }
+    });
+});
+</script>

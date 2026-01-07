@@ -283,3 +283,260 @@ html {
 ::-webkit-scrollbar-thumb:hover {
     background: #6c757d;
 }
+
+/* ===== STRAVA BRAND UTILITIES ===== */
+/* Official Strava Orange: #FC4C02 */
+
+.strava-brand {
+    color: #FC4C02 !important;
+}
+
+.bg-strava {
+    background-color: #FC4C02 !important;
+    color: white !important;
+}
+
+.btn-strava {
+    background-color: #FC4C02;
+    border-color: #FC4C02;
+    color: white;
+}
+
+.btn-strava:hover,
+.btn-strava:focus {
+    background-color: #e04402;
+    border-color: #e04402;
+    color: white;
+}
+
+.btn-outline-strava {
+    color: #FC4C02;
+    border-color: #FC4C02;
+    background-color: transparent;
+}
+
+.btn-outline-strava:hover,
+.btn-outline-strava:focus {
+    background-color: #FC4C02;
+    border-color: #FC4C02;
+    color: white;
+}
+
+.alert-strava {
+    background-color: rgba(252, 76, 2, 0.1);
+    border: 1px solid #FC4C02;
+    color: #FC4C02;
+}
+
+/* ===== EXERCISE METADATA BADGES ===== */
+/* Standardized color system for exercise information */
+
+.badge-category {
+    background-color: #0d6efd !important;  /* Primary blue */
+    color: white !important;
+}
+
+.badge-muscle-primary {
+    background-color: #dc3545 !important;  /* Red for primary muscles */
+    color: white !important;
+}
+
+.badge-muscle-secondary {
+    background-color: #fd7e14 !important;  /* Orange for secondary muscles */
+    color: white !important;
+}
+
+.badge-equipment {
+    background-color: #6c757d !important;  /* Gray for equipment */
+    color: white !important;
+}
+
+.badge-target {
+    background-color: #198754 !important;  /* Green for target values */
+    color: white !important;
+}
+
+.badge-actual {
+    background-color: #0dcaf0 !important;  /* Cyan for actual logged values */
+    color: white !important;
+}
+
+/* ===== EXERCISE COMPONENT STYLES ===== */
+/* Consistent exercise card and list item styling */
+
+/* Exercise list item (compact view for browse/lists) */
+.exercise-item-header {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+}
+
+.exercise-item-name {
+    font-weight: 600;
+    margin: 0;
+}
+
+.exercise-item-meta {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+    margin-top: 0.5rem;
+}
+
+.exercise-item-actions {
+    display: flex;
+    gap: 0.25rem;
+}
+
+/* Exercise card (detailed view for edit/detail pages) */
+.exercise-card .card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+}
+
+.exercise-metadata {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+    margin-top: 1rem;
+}
+
+.exercise-targets {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+}
+
+/* Exercise log card (logging interface) */
+.exercise-log-card {
+    border: 2px solid transparent;
+    transition: border-color 0.3s ease;
+}
+
+.exercise-log-card:hover {
+    border-color: var(--bs-primary);
+}
+
+.exercise-log-meta {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+}
+
+.exercise-log-inputs {
+    margin-top: 1rem;
+}
+
+/* ===== UTILITY CLASSES ===== */
+
+/* Scrollable exercise list (used in edit pages) */
+.exercise-list-scroll {
+    max-height: 400px;
+    overflow-y: auto;
+}
+
+/* Thin progress bar (used in workout logging) */
+.progress-thin {
+    height: 5px;
+}
+
+/* Hidden by default (JavaScript will show when needed) */
+.d-none-init {
+    display: none;
+}
+
+/* ===== DESIGN SYSTEM DOCUMENTATION ===== */
+/* Shadow usage standards:
+ * - Use .shadow for elevated cards (main content)
+ * - Use .shadow-sm for subtle depth (nested cards)
+ */
+
+/* Button standards:
+ * Size:
+ *   - Primary page actions: .btn-lg.btn-touch
+ *   - Secondary actions: .btn.btn-touch (default)
+ *   - Inline/compact actions: .btn-sm
+ * Color:
+ *   - Primary actions: .btn-primary
+ *   - Success actions: .btn-success
+ *   - Strava actions: .btn-strava or .btn-outline-strava
+ *   - Destructive actions: .btn-danger
+ *   - Navigation: .btn-outline-secondary
+ *   - Information: .btn-info or .btn-outline-info
+ */
+
+/* ===== FONTAWESOME ICON ALIGNMENT FIXES ===== */
+/* Fix vertical alignment of FontAwesome icons in buttons and links */
+
+/* Use flexbox to properly center button content vertically */
+.btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+}
+
+/* Ensure FontAwesome icons have consistent sizing */
+.btn i[class^="fa-"],
+.btn i[class*=" fa-"] {
+    line-height: 1;
+    display: inline-block;
+}
+
+/* Remove the gap-based spacing when there's only an icon (no text) */
+.btn i[class^="fa-"]:only-child,
+.btn i[class*=" fa-"]:only-child {
+    margin: 0;
+}
+
+/* Fix alignment in navigation links */
+.nav-link i[class^="fa-"],
+.nav-link i[class*=" fa-"],
+.dropdown-item i[class^="fa-"],
+.dropdown-item i[class*=" fa-"] {
+    vertical-align: middle;
+    line-height: 1;
+    margin-right: 0.5rem;
+}
+
+/* Fix alignment in badges */
+.badge i[class^="fa-"],
+.badge i[class*=" fa-"] {
+    vertical-align: middle;
+    line-height: 1;
+}
+
+/* Fix alignment in list group items */
+.list-group-item i[class^="fa-"],
+.list-group-item i[class*=" fa-"] {
+    vertical-align: middle;
+    line-height: 1;
+}
+
+/* Fix alignment in headings */
+h1 i[class^="fa-"],
+h1 i[class*=" fa-"],
+h2 i[class^="fa-"],
+h2 i[class*=" fa-"],
+h3 i[class^="fa-"],
+h3 i[class*=" fa-"],
+h4 i[class^="fa-"],
+h4 i[class*=" fa-"],
+h5 i[class^="fa-"],
+h5 i[class*=" fa-"],
+h6 i[class^="fa-"],
+h6 i[class*=" fa-"] {
+    vertical-align: middle;
+    line-height: 1;
+}
+
+/* Fix alignment in alerts */
+.alert i[class^="fa-"],
+.alert i[class*=" fa-"] {
+    vertical-align: middle;
+    line-height: 1;
+}
