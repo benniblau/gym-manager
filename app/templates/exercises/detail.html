@@ -8,6 +8,30 @@
         <div class="col-lg-8">
             <h1 class="mb-4"><i class="fa-solid fa-dumbbell"></i> {{ exercise.name }}</h1>
 
+            <!-- Exercise Images -->
+            {% if exercise.image1_url or exercise.image2_url %}
+                <div class="card mb-4">
+                    <div class="card-body">
+                        <div class="row">
+                            {% if exercise.image1_url %}
+                                <div class="col-md-{{ '6' if exercise.image2_url else '12' }}">
+                                    <img src="{{ exercise.image1_url }}"
+                                         alt="{{ exercise.name }}"
+                                         class="img-fluid rounded">
+                                </div>
+                            {% endif %}
+                            {% if exercise.image2_url %}
+                                <div class="col-md-{{ '6' if exercise.image1_url else '12' }}">
+                                    <img src="{{ exercise.image2_url }}"
+                                         alt="{{ exercise.name }}"
+                                         class="img-fluid rounded">
+                                </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            {% endif %}
+
             <!-- Exercise info card -->
             <div class="card mb-4">
                 <div class="card-body">

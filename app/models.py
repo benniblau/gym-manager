@@ -605,11 +605,15 @@ class Exercise:
 
         exercise_dict = dict(exercise)
 
-        # Prepend /static/images/ to image URLs if they exist
+        # Prepend /static/images/ to image URLs only if they are local filenames (not paths or URLs)
         if exercise_dict.get('image1_url'):
-            exercise_dict['image1_url'] = f"/static/images/{exercise_dict['image1_url']}"
+            url = exercise_dict['image1_url']
+            if not url.startswith('/') and not url.startswith('http'):
+                exercise_dict['image1_url'] = f"/static/images/{url}"
         if exercise_dict.get('image2_url'):
-            exercise_dict['image2_url'] = f"/static/images/{exercise_dict['image2_url']}"
+            url = exercise_dict['image2_url']
+            if not url.startswith('/') and not url.startswith('http'):
+                exercise_dict['image2_url'] = f"/static/images/{url}"
 
         # Get instructions
         instructions = db.execute('''
