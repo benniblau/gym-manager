@@ -88,115 +88,137 @@
 
 <script>
 // Exercise details modal initialization
+// Create a single modal instance that will be reused
+let exerciseDetailsModalInstance = null;
+
+// Function to get or create the modal instance
+function getExerciseModal() {
+    if (!exerciseDetailsModalInstance) {
+        const modalElement = document.getElementById('exerciseDetailsModal');
+        exerciseDetailsModalInstance = new bootstrap.Modal(modalElement);
+
+        // Add cleanup handler when modal is hidden
+        modalElement.addEventListener('hidden.bs.modal', function() {
+            // Ensure backdrop and body classes are cleaned up
+            document.querySelectorAll('.modal-backdrop').forEach(backdrop => backdrop.remove());
+            document.body.classList.remove('modal-open');
+            document.body.style.overflow = '';
+            document.body.style.paddingRight = '';
+        });
+    }
+    return exerciseDetailsModalInstance;
+}
+
 // Attaches click handlers to all elements with class .view-exercise-details
-document.querySelectorAll('.view-exercise-details').forEach(button => {
-    button.addEventListener('click', async function() {
-        const exerciseId = this.getAttribute('data-exercise-id');
-        const exerciseName = this.getAttribute('data-exercise-name');
+document.addEventListener('click', async function(e) {
+    const button = e.target.closest('.view-exercise-details');
+    if (!button) return;
 
-        // Show modal
-        const modal = new bootstrap.Modal(document.getElementById('exerciseDetailsModal'));
-        modal.show();
+    const exerciseId = button.getAttribute('data-exercise-id');
+    const exerciseName = button.getAttribute('data-exercise-name');
 
-        // Reset modal state
-        document.getElementById('details-exercise-name').textContent = exerciseName;
-        document.getElementById('details-loading').style.display = 'block';
-        document.getElementById('details-content').style.display = 'none';
-        document.getElementById('details-error').style.display = 'none';
+    // Get the reusable modal instance
+    const modal = getExerciseModal();
+    modal.show();
 
-        try {
-            // Fetch exercise details from API
-            const response = await fetch(`/exercises/${exerciseId}/details`);
-            const data = await response.json();
+    // Reset modal state
+    document.getElementById('details-exercise-name').textContent = exerciseName;
+    document.getElementById('details-loading').style.display = 'block';
+    document.getElementById('details-content').style.display = 'none';
+    document.getElementById('details-error').style.display = 'none';
 
-            if (data.error) {
-                throw new Error(data.error);
-            }
+    try {
+        // Fetch exercise details from API
+        const response = await fetch(`/exercises/${exerciseId}/details`);
+        const data = await response.json();
 
-            // Hide loading, show content
-            document.getElementById('details-loading').style.display = 'none';
-            document.getElementById('details-content').style.display = 'block';
-
-            // Populate modal with data
-            document.getElementById('details-category').textContent = data.category_name || '';
-            document.getElementById('details-muscles').textContent = data.primary_muscles || '';
-            document.getElementById('details-description').textContent = data.description || 'No description available';
-
-            // Images
-            const imagesContainer = document.getElementById('details-images-container');
-            const image1Container = document.getElementById('details-image1-container');
-            const image2Container = document.getElementById('details-image2-container');
-
-            let hasImages = false;
-            if (data.image1_url) {
-                document.getElementById('details-image1').src = data.image1_url;
-                image1Container.style.display = 'block';
-                hasImages = true;
-            } else {
-                image1Container.style.display = 'none';
-            }
-
-            if (data.image2_url) {
-                document.getElementById('details-image2').src = data.image2_url;
-                image2Container.style.display = 'block';
-                hasImages = true;
-            } else {
-                image2Container.style.display = 'none';
-            }
-
-            imagesContainer.style.display = hasImages ? 'block' : 'none';
-
-            // Instructions
-            const instructionsContainer = document.getElementById('details-instructions-container');
-            const instructionsList = document.getElementById('details-instructions');
-            if (data.instructions && data.instructions.length > 0) {
-                instructionsList.innerHTML = '';
-                data.instructions.forEach(instruction => {
-                    const li = document.createElement('li');
-                    li.textContent = instruction;
-                    instructionsList.appendChild(li);
-                });
-                instructionsContainer.style.display = 'block';
-            } else {
-                instructionsContainer.style.display = 'none';
-            }
-
-            // Equipment
-            const equipmentContainer = document.getElementById('details-equipment-container');
-            if (data.equipment && data.equipment.length > 0) {
-                document.getElementById('details-equipment').textContent = data.equipment.join(', ');
-                equipmentContainer.style.display = 'block';
-            } else {
-                equipmentContainer.style.display = 'none';
-            }
-
-            // External links
-            const videoLink = document.getElementById('details-video-link');
-            if (data.video) {
-                videoLink.href = data.video;
-                videoLink.style.display = 'inline-block';
-            } else {
-                videoLink.style.display = 'none';
-            }
-
-            // Exercem link
-            const exercemLink = document.getElementById('details-exercem-link');
-            exercemLink.href = `https://exercem.us/exercises/${encodeURIComponent(data.name.toLowerCase().replace(/ /g, '-'))}`;
-
-            // Garmin link
-            const garminLink = document.getElementById('details-garmin-link');
-            if (data.garmin_url) {
-                garminLink.href = data.garmin_url;
-                garminLink.style.display = 'inline-block';
-            } else {
-                garminLink.style.display = 'none';
-            }
-
-        } catch (error) {
-            console.error('Error fetching exercise details:', error);
-            document.getElementById('details-loading').style.display = 'none';
-            document.getElementById('details-error').style.display = 'block';
+        if (data.error) {
+            throw new Error(data.error);
         }
-    });
+
+        // Hide loading, show content
+        document.getElementById('details-loading').style.display = 'none';
+        document.getElementById('details-content').style.display = 'block';
+
+        // Populate modal with data
+        document.getElementById('details-category').textContent = data.category_name || '';
+        document.getElementById('details-muscles').textContent = data.primary_muscles || '';
+        document.getElementById('details-description').textContent = data.description || 'No description available';
+
+        // Images
+        const imagesContainer = document.getElementById('details-images-container');
+        const image1Container = document.getElementById('details-image1-container');
+        const image2Container = document.getElementById('details-image2-container');
+
+        let hasImages = false;
+        if (data.image1_url) {
+            document.getElementById('details-image1').src = data.image1_url;
+            image1Container.style.display = 'block';
+            hasImages = true;
+        } else {
+            image1Container.style.display = 'none';
+        }
+
+        if (data.image2_url) {
+            document.getElementById('details-image2').src = data.image2_url;
+            image2Container.style.display = 'block';
+            hasImages = true;
+        } else {
+            image2Container.style.display = 'none';
+        }
+
+        imagesContainer.style.display = hasImages ? 'block' : 'none';
+
+        // Instructions
+        const instructionsContainer = document.getElementById('details-instructions-container');
+        const instructionsList = document.getElementById('details-instructions');
+        if (data.instructions && data.instructions.length > 0) {
+            instructionsList.innerHTML = '';
+            data.instructions.forEach(instruction => {
+                const li = document.createElement('li');
+                li.textContent = instruction;
+                instructionsList.appendChild(li);
+            });
+            instructionsContainer.style.display = 'block';
+        } else {
+            instructionsContainer.style.display = 'none';
+        }
+
+        // Equipment
+        const equipmentContainer = document.getElementById('details-equipment-container');
+        if (data.equipment && data.equipment.length > 0) {
+            document.getElementById('details-equipment').textContent = data.equipment.join(', ');
+            equipmentContainer.style.display = 'block';
+        } else {
+            equipmentContainer.style.display = 'none';
+        }
+
+        // External links
+        const videoLink = document.getElementById('details-video-link');
+        if (data.video) {
+            videoLink.href = data.video;
+            videoLink.style.display = 'inline-block';
+        } else {
+            videoLink.style.display = 'none';
+        }
+
+        // Exercem link
+        const exercemLink = document.getElementById('details-exercem-link');
+        exercemLink.href = `https://exercem.us/exercises/${encodeURIComponent(data.name.toLowerCase().replace(/ /g, '-'))}`;
+
+        // Garmin link
+        const garminLink = document.getElementById('details-garmin-link');
+        if (data.garmin_url) {
+            garminLink.href = data.garmin_url;
+            garminLink.style.display = 'inline-block';
+        } else {
+            garminLink.style.display = 'none';
+        }
+
+    } catch (error) {
+        console.error('Error fetching exercise details:', error);
+        document.getElementById('details-loading').style.display = 'none';
+        document.getElementById('details-error').style.display = 'block';
+    }
 });
 </script>

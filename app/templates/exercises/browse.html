@@ -44,7 +44,7 @@
                         </select>
                     </div>
 
-                    <!-- Search button -->
+                    <!-- Search button (optional - filters work automatically) -->
                     <div class="col-md-2">
                         <button type="submit" class="btn btn-primary btn-lg btn-touch w-100">
                             <i class="fa-solid fa-magnifying-glass"></i> Filter
@@ -134,4 +134,35 @@
 </div>
 
 {% include 'includes/exercise_details_modal.html' %}
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const form = document.querySelector('form');
+    const searchInput = document.querySelector('input[name="q"]');
+    const categorySelect = document.querySelector('select[name="category"]');
+    const muscleSelect = document.querySelector('select[name="muscle"]');
+
+    let searchTimeout = null;
+
+    // Auto-submit on search input with debouncing (500ms delay)
+    searchInput.addEventListener('input', function() {
+        clearTimeout(searchTimeout);
+        searchTimeout = setTimeout(function() {
+            form.submit();
+        }, 500);
+    });
+
+    // Auto-submit immediately on category change
+    categorySelect.addEventListener('change', function() {
+        form.submit();
+    });
+
+    // Auto-submit immediately on muscle change
+    muscleSelect.addEventListener('change', function() {
+        form.submit();
+    });
+});
+</script>
 {% endblock %}

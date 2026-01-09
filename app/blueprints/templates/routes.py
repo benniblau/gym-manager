@@ -148,9 +148,12 @@ def use_template(template_id):
 
     if request.method == 'POST':
         scheduled_date = request.form.get('scheduled_date')
-        scheduled_time = request.form.get('scheduled_time') or None
-        duration_minutes = request.form.get('duration_minutes') or None
-        notes = request.form.get('notes') or None
+        scheduled_time = request.form.get('scheduled_time', '').strip() or None
+        duration_minutes = request.form.get('duration_minutes', '').strip() or None
+        form_notes = request.form.get('notes', '').strip() or None
+
+        # Use form notes if provided, otherwise fall back to template notes
+        notes = form_notes if form_notes else template.notes
 
         # Parse date
         parsed_date = datetime.strptime(scheduled_date, '%Y-%m-%d').date()

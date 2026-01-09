@@ -24,7 +24,7 @@ def browse():
     # Get exercises based on filters
     if search_query:
         exercises = Exercise.search(search_query, limit=per_page, offset=offset)
-        total_count = Exercise.count()  # Approximate for search
+        total_count = Exercise.count_search(search_query)
     elif category or muscle or equipment:
         exercises = Exercise.filter(
             category=category,
@@ -33,7 +33,7 @@ def browse():
             limit=per_page,
             offset=offset
         )
-        total_count = Exercise.count()  # Approximate for filters
+        total_count = Exercise.count_filter(category=category, muscle=muscle, equipment=equipment)
     else:
         exercises = Exercise.get_all(limit=per_page, offset=offset)
         total_count = Exercise.count()

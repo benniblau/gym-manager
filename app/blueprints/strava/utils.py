@@ -119,9 +119,11 @@ def format_workout_description(workout, exercises):
     """Format workout exercises into Strava description with emojis"""
     lines = []
 
-    # Add workout notes if present
+    # Add workout notes/description if present
     if workout.notes:
-        lines.append(workout.notes)
+        lines.append('📝 ' + workout.notes)
+        lines.append('')
+        lines.append('---')
         lines.append('')
 
     # Add each exercise

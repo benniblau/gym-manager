@@ -331,7 +331,7 @@ class Workout:
         if template.user_id != user_id and not template.is_public:
             raise ValueError("Template is private and does not belong to user")
 
-        # Create new workout with template's name
+        # Create new workout with template's name and provided parameters
         workout = Workout.create(
             user_id=user_id,
             name=template.name,
@@ -340,7 +340,7 @@ class Workout:
             duration_minutes=duration_minutes,
             end_date=end_date,
             end_time=end_time,
-            notes=notes or template.notes
+            notes=notes  # Notes should be pre-set by caller (with template notes as fallback)
         )
 
         # Copy exercises from template
@@ -698,6 +698,59 @@ class Exercise:
         """Count total number of exercises"""
         db = get_db()
         row = db.execute('SELECT COUNT(*) as count FROM exercises').fetchone()
+        return row['count']
+
+    @staticmethod
+    def count_search(query):
+        """Count exercises matching search query"""
+        db = get_db()
+        search_term = f'%{query}%'
+        row = db.execute('''
+            SELECT COUNT(*) as count FROM exercises
+            WHERE name LIKE ? OR description LIKE ?
+        ''', (search_term, search_term)).fetchone()
+        return row['count']
+
+    @staticmethod
+    def count_filter(category=None, muscle=None, equipment=None):
+        """Count exercises matching filter criteria"""
+        db = get_db()
+
+        query = '''
+            SELECT COUNT(DISTINCT e.id) as count
+            FROM exercises e
+            LEFT JOIN categories c ON e.category_id = c.id
+        '''
+
+        conditions = []
+        params = []
+
+        if category:
+            conditions.append('c.name = ?')
+            params.append(category)
+
+        if muscle:
+            query += '''
+                LEFT JOIN exercise_primary_muscles epm ON e.id = epm.exercise_id
+                LEFT JOIN exercise_secondary_muscles esm ON e.id = esm.exercise_id
+                LEFT JOIN muscles m1 ON epm.muscle_id = m1.id
+                LEFT JOIN muscles m2 ON esm.muscle_id = m2.id
+            '''
+            conditions.append('(m1.name = ? OR m2.name = ?)')
+            params.extend([muscle, muscle])
+
+        if equipment:
+            query += '''
+                LEFT JOIN exercise_equipment ee ON e.id = ee.exercise_id
+                LEFT JOIN equipment eq ON ee.equipment_id = eq.id
+            '''
+            conditions.append('eq.name = ?')
+            params.append(equipment)
+
+        if conditions:
+            query += ' WHERE ' + ' AND '.join(conditions)
+
+        row = db.execute(query, params).fetchone()
         return row['count']
 
     @staticmethod
