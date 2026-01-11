@@ -397,10 +397,19 @@ def complete(workout_id):
     if not workout or workout.user_id != current_user.id:
         abort(404)
 
-    # Just mark as completed - user will set times explicitly via edit page
-    workout.update(status='completed')
+    # Set completed_at to now, and started_at if not already set
+    update_params = {
+        'status': 'completed',
+        'completed_at': datetime.now()
+    }
 
-    flash('Workout completed! Great job! You can set start/end times in the edit page.', 'success')
+    # If started_at wasn't set, set it to completed_at (same time)
+    if not workout.started_at:
+        update_params['started_at'] = datetime.now()
+
+    workout.update(**update_params)
+
+    flash('Workout completed! Great job!', 'success')
     return redirect(url_for('workouts.detail', workout_id=workout_id))
 
 
