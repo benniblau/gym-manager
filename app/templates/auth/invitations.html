@@ -1,0 +1,158 @@
+{% extends "base.html" %}
+
+{% block title %}Manage Invitations - Gym Manager{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="row mb-4">
+        <div class="col">
+            <h1 class="mb-3"><i class="fa-solid fa-envelope"></i> Manage Invitations</h1>
+            <a href="{{ url_for('auth.invite') }}" class="btn btn-primary btn-touch">
+                <i class="fa-solid fa-plus"></i> Create New Invitation
+            </a>
+        </div>
+    </div>
+
+    <!-- Pending Invitations -->
+    <div class="row mb-4">
+        <div class="col">
+            <div class="card shadow">
+                <div class="card-header bg-warning text-dark">
+                    <h5 class="mb-0"><i class="fa-solid fa-clock"></i> Pending Invitations ({{ pending|length }})</h5>
+                </div>
+                <div class="card-body">
+                    {% if pending %}
+                        <div class="table-responsive">
+                            <table class="table table-hover">
+                                <thead>
+                                    <tr>
+                                        <th>Email</th>
+                                        <th>Created</th>
+                                        <th>Expires</th>
+                                        <th>Notes</th>
+                                        <th>Link</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for invitation in pending %}
+                                        <tr>
+                                            <td>{{ invitation.recipient_email or '<em>Not specified</em>' }}</td>
+                                            <td>{{ invitation.created_at[:10] }}</td>
+                                            <td>
+                                                {% if invitation.expires_at %}
+                                                    {{ invitation.expires_at[:10] }}
+                                                {% else %}
+                                                    Never
+                                                {% endif %}
+                                            </td>
+                                            <td>
+                                                {% if invitation.notes %}
+                                                    <small>{{ invitation.notes[:50] }}{% if invitation.notes|length > 50 %}...{% endif %}</small>
+                                                {% else %}
+                                                    -
+                                                {% endif %}
+                                            </td>
+                                            <td>
+                                                <button class="btn btn-sm btn-outline-primary btn-touch copy-link"
+                                                        data-link="{{ url_for('auth.accept_invite', token=invitation.token, _external=True) }}"
+                                                        title="Copy invitation link">
+                                                    <i class="fa-solid fa-copy"></i> Copy
+                                                </button>
+                                            </td>
+                                            <td>
+                                                <form method="POST" action="{{ url_for('auth.revoke_invite', invitation_id=invitation.id) }}" style="display: inline;">
+                                                    <button type="submit" class="btn btn-sm btn-danger btn-touch"
+                                                            onclick="return confirm('Are you sure you want to revoke this invitation?')">
+                                                        <i class="fa-solid fa-ban"></i> Revoke
+                                                    </button>
+                                                </form>
+                                            </td>
+                                        </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    {% else %}
+                        <p class="text-muted mb-0">No pending invitations. <a href="{{ url_for('auth.invite') }}">Create one now</a>.</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Accepted Invitations -->
+    <div class="row mb-4">
+        <div class="col">
+            <div class="card shadow">
+                <div class="card-header bg-success text-white">
+                    <h5 class="mb-0"><i class="fa-solid fa-check"></i> Accepted Invitations ({{ accepted|length }})</h5>
+                </div>
+                <div class="card-body">
+                    {% if accepted %}
+                        <div class="table-responsive">
+                            <table class="table table-hover">
+                                <thead>
+                                    <tr>
+                                        <th>Email</th>
+                                        <th>Created</th>
+                                        <th>Accepted</th>
+                                        <th>Notes</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for invitation in accepted %}
+                                        <tr>
+                                            <td>{{ invitation.recipient_email or '<em>Not specified</em>' }}</td>
+                                            <td>{{ invitation.created_at[:10] }}</td>
+                                            <td>{{ invitation.accepted_at[:10] if invitation.accepted_at else '-' }}</td>
+                                            <td>
+                                                {% if invitation.notes %}
+                                                    <small>{{ invitation.notes[:50] }}{% if invitation.notes|length > 50 %}...{% endif %}</small>
+                                                {% else %}
+                                                    -
+                                                {% endif %}
+                                            </td>
+                                        </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    {% else %}
+                        <p class="text-muted mb-0">No accepted invitations yet.</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="text-center">
+        <a href="{{ url_for('auth.settings') }}"><i class="fa-solid fa-arrow-left"></i> Back to Settings</a>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Copy link functionality
+document.querySelectorAll('.copy-link').forEach(btn => {
+    btn.addEventListener('click', function() {
+        const link = this.dataset.link;
+        navigator.clipboard.writeText(link).then(() => {
+            const originalHtml = this.innerHTML;
+            this.innerHTML = '<i class="fa-solid fa-check"></i> Copied!';
+            this.classList.remove('btn-outline-primary');
+            this.classList.add('btn-success');
+
+            setTimeout(() => {
+                this.innerHTML = originalHtml;
+                this.classList.remove('btn-success');
+                this.classList.add('btn-outline-primary');
+            }, 2000);
+        }).catch(err => {
+            alert('Failed to copy link. Please copy manually: ' + link);
+        });
+    });
+});
+</script>
+{% endblock %}

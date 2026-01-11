@@ -10,7 +10,20 @@
                 <h2 class="card-title text-center mb-4">
                     <i class="fa-solid fa-user-plus"></i> Register
                 </h2>
-                <form method="POST" action="{{ url_for('auth.register') }}">
+
+                {% if first_user %}
+                    <div class="alert alert-info mb-4">
+                        <i class="fa-solid fa-info-circle"></i> <strong>First User Setup</strong><br>
+                        You are registering as the first user of this gym manager instance.
+                    </div>
+                {% elif invitation %}
+                    <div class="alert alert-success mb-4">
+                        <i class="fa-solid fa-envelope"></i> <strong>Invited by {{ sender.username }}</strong><br>
+                        You have been invited to join the gym manager.
+                    </div>
+                {% endif %}
+
+                <form method="POST" action="{{ url_for('auth.register_with_invite', token=invitation.token) if invitation else url_for('auth.register') }}">
                     {{ form.hidden_tag() }}
 
                     <div class="mb-3">

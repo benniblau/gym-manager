@@ -1,0 +1,59 @@
+{% extends "base.html" %}
+
+{% block title %}Send Invitation - Gym Manager{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-8 col-lg-6">
+        <div class="card shadow">
+            <div class="card-body">
+                <h2 class="card-title text-center mb-4">
+                    <i class="fa-solid fa-envelope"></i> Send Invitation
+                </h2>
+                <p class="text-muted text-center mb-4">
+                    Invite a new user to join the gym manager. They will receive a unique invitation link to register.
+                </p>
+
+                <form method="POST" action="{{ url_for('auth.invite') }}">
+                    {{ form.hidden_tag() }}
+
+                    <div class="mb-3">
+                        {{ form.recipient_email.label(class="form-label") }}
+                        {{ form.recipient_email(class="form-control" + (" is-invalid" if form.recipient_email.errors else ""), placeholder="email@example.com") }}
+                        <small class="form-text text-muted">Optional: Pre-fill the registration email</small>
+                        {% if form.recipient_email.errors %}
+                            <div class="invalid-feedback">
+                                {% for error in form.recipient_email.errors %}
+                                    {{ error }}
+                                {% endfor %}
+                            </div>
+                        {% endif %}
+                    </div>
+
+                    <div class="mb-3">
+                        {{ form.notes.label(class="form-label") }}
+                        {{ form.notes(class="form-control" + (" is-invalid" if form.notes.errors else ""), rows="3", placeholder="Add a note about this invitation...") }}
+                        <small class="form-text text-muted">Optional: Add notes for your reference</small>
+                        {% if form.notes.errors %}
+                            <div class="invalid-feedback">
+                                {% for error in form.notes.errors %}
+                                    {{ error }}
+                                {% endfor %}
+                            </div>
+                        {% endif %}
+                    </div>
+
+                    <div class="d-grid gap-2">
+                        {{ form.submit(class="btn btn-primary btn-lg btn-touch") }}
+                        <a href="{{ url_for('auth.invitations') }}" class="btn btn-outline-secondary btn-touch">Cancel</a>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <div class="text-center mt-3">
+            <a href="{{ url_for('auth.invitations') }}"><i class="fa-solid fa-arrow-left"></i> Back to Invitations</a>
+        </div>
+    </div>
+</div>
+{% endblock %}

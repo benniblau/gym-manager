@@ -75,6 +75,28 @@
         </div>
     </div>
 
+    <!-- Invitations -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="fa-solid fa-envelope"></i> User Invitations</h5>
+                </div>
+                <div class="card-body">
+                    <p class="mb-3">Invite new users to join the gym manager. Only registered users can invite others.</p>
+                    <div class="d-grid gap-2 d-md-flex">
+                        <a href="{{ url_for('auth.invite') }}" class="btn btn-primary btn-lg btn-touch">
+                            <i class="fa-solid fa-plus"></i> Create New Invitation
+                        </a>
+                        <a href="{{ url_for('auth.invitations') }}" class="btn btn-outline-primary btn-lg btn-touch">
+                            <i class="fa-solid fa-list"></i> Manage Invitations
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- Update Email -->
     <div class="card mb-4">
         <div class="card-header">

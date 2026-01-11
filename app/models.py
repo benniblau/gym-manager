@@ -79,13 +79,13 @@ class User:
         return None
 
     @staticmethod
-    def create(username, email, password):
+    def create(username, email, password, invited_by=None, invitation_id=None):
         """Create new user"""
         db = get_db()
         password_hash = generate_password_hash(password)
         cursor = db.execute(
-            'INSERT INTO users (username, email, password_hash) VALUES (?, ?, ?)',
-            (username, email, password_hash)
+            'INSERT INTO users (username, email, password_hash, invited_by, invitation_id) VALUES (?, ?, ?, ?, ?)',
+            (username, email, password_hash, invited_by, invitation_id)
         )
         db.commit()
         return User.get_by_id(cursor.lastrowid)
@@ -140,6 +140,195 @@ class User:
 
     def get_id(self):
         return str(self.id)
+
+    @staticmethod
+    def count():
+        """Count total number of users"""
+        db = get_db()
+        row = db.execute('SELECT COUNT(*) as count FROM users').fetchone()
+        return row['count']
+
+
+class Invitation:
+    """Invitation model for user registration"""
+
+    def __init__(self, id, token, sender_id, recipient_email, status,
+                 created_at, expires_at, accepted_at, recipient_user_id, notes):
+        self.id = id
+        self.token = token
+        self.sender_id = sender_id
+        self.recipient_email = recipient_email
+        self.status = status
+        self.created_at = created_at
+        self.expires_at = expires_at
+        self.accepted_at = accepted_at
+        self.recipient_user_id = recipient_user_id
+        self.notes = notes
+
+    @staticmethod
+    def create(sender_id, recipient_email=None, expires_in_days=30, notes=None):
+        """Create new invitation with unique token"""
+        import secrets
+        from datetime import timedelta
+
+        token = secrets.token_urlsafe(32)
+
+        # Calculate expiry
+        expires_at = None
+        if expires_in_days:
+            expires_at = (datetime.now() + timedelta(days=expires_in_days)).isoformat()
+
+        db = get_db()
+        cursor = db.execute('''
+            INSERT INTO invitations (token, sender_id, recipient_email, expires_at, notes)
+            VALUES (?, ?, ?, ?, ?)
+        ''', (token, sender_id, recipient_email, expires_at, notes))
+        db.commit()
+
+        return Invitation.get_by_id(cursor.lastrowid)
+
+    @staticmethod
+    def get_by_id(invitation_id):
+        """Get invitation by ID"""
+        db = get_db()
+        row = db.execute('SELECT * FROM invitations WHERE id = ?', (invitation_id,)).fetchone()
+        if row:
+            return Invitation(
+                id=row['id'],
+                token=row['token'],
+                sender_id=row['sender_id'],
+                recipient_email=row['recipient_email'],
+                status=row['status'],
+                created_at=row['created_at'],
+                expires_at=row['expires_at'],
+                accepted_at=row['accepted_at'],
+                recipient_user_id=row['recipient_user_id'],
+                notes=row['notes']
+            )
+        return None
+
+    @staticmethod
+    def get_by_token(token):
+        """Get invitation by token"""
+        db = get_db()
+        row = db.execute('SELECT * FROM invitations WHERE token = ?', (token,)).fetchone()
+        if row:
+            return Invitation(
+                id=row['id'],
+                token=row['token'],
+                sender_id=row['sender_id'],
+                recipient_email=row['recipient_email'],
+                status=row['status'],
+                created_at=row['created_at'],
+                expires_at=row['expires_at'],
+                accepted_at=row['accepted_at'],
+                recipient_user_id=row['recipient_user_id'],
+                notes=row['notes']
+            )
+        return None
+
+    @staticmethod
+    def get_by_sender(sender_id, status=None):
+        """Get all invitations sent by a user, optionally filtered by status"""
+        db = get_db()
+
+        if status:
+            rows = db.execute('''
+                SELECT * FROM invitations
+                WHERE sender_id = ? AND status = ?
+                ORDER BY created_at DESC
+            ''', (sender_id, status)).fetchall()
+        else:
+            rows = db.execute('''
+                SELECT * FROM invitations
+                WHERE sender_id = ?
+                ORDER BY created_at DESC
+            ''', (sender_id,)).fetchall()
+
+        return [Invitation(
+            id=row['id'],
+            token=row['token'],
+            sender_id=row['sender_id'],
+            recipient_email=row['recipient_email'],
+            status=row['status'],
+            created_at=row['created_at'],
+            expires_at=row['expires_at'],
+            accepted_at=row['accepted_at'],
+            recipient_user_id=row['recipient_user_id'],
+            notes=row['notes']
+        ) for row in rows]
+
+    def is_valid(self):
+        """Check if invitation is valid (not expired/accepted/revoked)"""
+        if self.status != 'pending':
+            return False
+
+        if self.expires_at:
+            from datetime import datetime as dt
+            try:
+                expires_dt = dt.fromisoformat(self.expires_at)
+                if expires_dt < datetime.now():
+                    # Auto-expire the invitation
+                    self.update(status='expired')
+                    return False
+            except (ValueError, TypeError):
+                # Invalid date format
+                return False
+
+        return True
+
+    def accept(self, user_id):
+        """Mark invitation as accepted"""
+        db = get_db()
+        db.execute('''
+            UPDATE invitations
+            SET status = 'accepted', accepted_at = ?, recipient_user_id = ?
+            WHERE id = ?
+        ''', (datetime.now().isoformat(), user_id, self.id))
+        db.commit()
+
+        self.status = 'accepted'
+        self.accepted_at = datetime.now().isoformat()
+        self.recipient_user_id = user_id
+
+    def revoke(self):
+        """Revoke pending invitation"""
+        if self.status != 'pending':
+            return False
+
+        db = get_db()
+        db.execute('''
+            UPDATE invitations
+            SET status = 'revoked'
+            WHERE id = ?
+        ''', (self.id,))
+        db.commit()
+
+        self.status = 'revoked'
+        return True
+
+    def update(self, **kwargs):
+        """Update invitation fields"""
+        db = get_db()
+
+        fields = []
+        values = []
+
+        for key in ['status', 'recipient_email', 'notes', 'accepted_at', 'recipient_user_id']:
+            if key in kwargs:
+                fields.append(f'{key} = ?')
+                values.append(kwargs[key])
+
+        if fields:
+            values.append(self.id)
+            query = f"UPDATE invitations SET {', '.join(fields)} WHERE id = ?"
+            db.execute(query, values)
+            db.commit()
+
+            # Update instance attributes
+            for key, value in kwargs.items():
+                if hasattr(self, key):
+                    setattr(self, key, value)
 
 
 class Workout:

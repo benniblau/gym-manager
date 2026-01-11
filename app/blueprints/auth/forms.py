@@ -1,11 +1,12 @@
 from flask_wtf import FlaskForm
-from wtforms import StringField, PasswordField, BooleanField, SubmitField
-from wtforms.validators import DataRequired, Email, EqualTo, Length, ValidationError
-from app.models import User
+from wtforms import StringField, PasswordField, BooleanField, SubmitField, TextAreaField, HiddenField
+from wtforms.validators import DataRequired, Email, EqualTo, Length, ValidationError, Optional
+from app.models import User, Invitation
 
 
 class RegistrationForm(FlaskForm):
-    """User registration form"""
+    """User registration form - requires invitation token"""
+    invitation_token = HiddenField('Invitation Token', validators=[DataRequired()])
     username = StringField('Username',
                           validators=[DataRequired(), Length(min=3, max=20)])
     email = StringField('Email',
@@ -27,6 +28,12 @@ class RegistrationForm(FlaskForm):
         user = User.get_by_email(email.data)
         if user is not None:
             raise ValidationError('Email already registered. Please use a different one.')
+
+    def validate_invitation_token(self, field):
+        """Validate invitation token"""
+        invitation = Invitation.get_by_token(field.data)
+        if not invitation or not invitation.is_valid():
+            raise ValidationError('Invalid or expired invitation token.')
 
 
 class LoginForm(FlaskForm):
@@ -71,3 +78,12 @@ class UpdateStravaCredentialsForm(FlaskForm):
     athlete_id = StringField('Athlete ID (optional)')
     athlete_username = StringField('Athlete Username (optional)')
     submit = SubmitField('Update Strava Credentials')
+
+
+class InviteForm(FlaskForm):
+    """Form for sending invitation"""
+    recipient_email = StringField('Recipient Email (optional)',
+                                  validators=[Optional(), Email()])
+    notes = TextAreaField('Notes (optional)',
+                         validators=[Optional(), Length(max=500)])
+    submit = SubmitField('Generate Invitation')

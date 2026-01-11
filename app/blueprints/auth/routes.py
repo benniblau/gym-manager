@@ -1,36 +1,41 @@
-from flask import Blueprint, render_template, redirect, url_for, flash, request
+from flask import Blueprint, render_template, redirect, url_for, flash, request, abort
 from flask_login import login_user, logout_user, login_required, current_user
 from urllib.parse import urlparse
 
-from app.blueprints.auth.forms import RegistrationForm, LoginForm, UpdateEmailForm, UpdatePasswordForm, UpdateStravaCredentialsForm
-from app.models import User, StravaConnection
+from app.blueprints.auth.forms import RegistrationForm, LoginForm, UpdateEmailForm, UpdatePasswordForm, UpdateStravaCredentialsForm, InviteForm
+from app.models import User, StravaConnection, Invitation
 
 auth_bp = Blueprint('auth', __name__)
 
 
 @auth_bp.route('/register', methods=['GET', 'POST'])
 def register():
-    """User registration"""
+    """Registration redirect - requires invitation"""
     if current_user.is_authenticated:
         return redirect(url_for('main.dashboard'))
 
-    form = RegistrationForm()
+    # Check if this is the first user (bootstrap)
+    if User.count() == 0:
+        # Allow first user to register without invitation
+        form = RegistrationForm()
+        # Remove invitation token requirement for first user
+        form.invitation_token.validators = []
 
-    if form.validate_on_submit():
-        # Create user
-        user = User.create(
-            username=form.username.data,
-            email=form.email.data,
-            password=form.password.data
-        )
+        if form.validate_on_submit():
+            user = User.create(
+                username=form.username.data,
+                email=form.email.data,
+                password=form.password.data
+            )
+            flash('Registration successful! You are now logged in as the first user.', 'success')
+            login_user(user)
+            return redirect(url_for('main.dashboard'))
 
-        flash('Registration successful! You are now logged in.', 'success')
+        return render_template('auth/register.html', form=form, first_user=True)
 
-        # Log user in automatically
-        login_user(user)
-        return redirect(url_for('main.dashboard'))
-
-    return render_template('auth/register.html', form=form)
+    # Not first user - require invitation
+    flash('Registration requires an invitation. Please ask an existing user for an invite link.', 'info')
+    return redirect(url_for('auth.login'))
 
 
 @auth_bp.route('/login', methods=['GET', 'POST'])
@@ -176,3 +181,117 @@ def update_strava_credentials():
                 flash(f'{error}', 'danger')
 
     return redirect(url_for('auth.settings'))
+
+
+@auth_bp.route('/invite', methods=['GET', 'POST'])
+@login_required
+def invite():
+    """Send invitation (create token)"""
+    form = InviteForm()
+
+    if form.validate_on_submit():
+        invitation = Invitation.create(
+            sender_id=current_user.id,
+            recipient_email=form.recipient_email.data,
+            notes=form.notes.data
+        )
+
+        # Generate full URL
+        invite_url = url_for('auth.accept_invite',
+                            token=invitation.token,
+                            _external=True)
+
+        flash(f'Invitation created! Share this link: {invite_url}', 'success')
+        return redirect(url_for('auth.invitations'))
+
+    return render_template('auth/invite.html', form=form)
+
+
+@auth_bp.route('/invitations')
+@login_required
+def invitations():
+    """Manage user's invitations"""
+    pending = Invitation.get_by_sender(current_user.id, status='pending')
+    accepted = Invitation.get_by_sender(current_user.id, status='accepted')
+
+    return render_template('auth/invitations.html',
+                          pending=pending,
+                          accepted=accepted)
+
+
+@auth_bp.route('/invitations/<int:invitation_id>/revoke', methods=['POST'])
+@login_required
+def revoke_invite(invitation_id):
+    """Revoke pending invitation"""
+    invitation = Invitation.get_by_id(invitation_id)
+
+    if not invitation or invitation.sender_id != current_user.id:
+        abort(404)
+
+    if invitation.status != 'pending':
+        flash('Can only revoke pending invitations.', 'danger')
+        return redirect(url_for('auth.invitations'))
+
+    invitation.revoke()
+    flash('Invitation revoked.', 'success')
+    return redirect(url_for('auth.invitations'))
+
+
+@auth_bp.route('/invite/<token>')
+def accept_invite(token):
+    """Preview/accept invitation"""
+    invitation = Invitation.get_by_token(token)
+
+    if not invitation:
+        flash('Invalid invitation link.', 'danger')
+        return redirect(url_for('auth.login'))
+
+    if not invitation.is_valid():
+        flash('This invitation has expired or is no longer valid.', 'warning')
+        return redirect(url_for('auth.login'))
+
+    # Get sender info
+    sender = User.get_by_id(invitation.sender_id)
+
+    return render_template('auth/accept_invite.html',
+                          invitation=invitation,
+                          sender=sender)
+
+
+@auth_bp.route('/register/<token>', methods=['GET', 'POST'])
+def register_with_invite(token):
+    """Register with invitation token"""
+    invitation = Invitation.get_by_token(token)
+
+    if not invitation or not invitation.is_valid():
+        flash('Invalid or expired invitation.', 'danger')
+        return redirect(url_for('auth.login'))
+
+    form = RegistrationForm()
+    form.invitation_token.data = token
+
+    # Pre-fill email if provided
+    if invitation.recipient_email and not form.email.data:
+        form.email.data = invitation.recipient_email
+
+    if form.validate_on_submit():
+        user = User.create(
+            username=form.username.data,
+            email=form.email.data,
+            password=form.password.data,
+            invited_by=invitation.sender_id,
+            invitation_id=invitation.id
+        )
+
+        # Mark invitation as accepted
+        invitation.accept(user.id)
+
+        flash('Registration successful! You are now logged in.', 'success')
+        login_user(user)
+        return redirect(url_for('main.dashboard'))
+
+    sender = User.get_by_id(invitation.sender_id)
+    return render_template('auth/register.html',
+                          form=form,
+                          invitation=invitation,
+                          sender=sender)
