@@ -18,6 +18,17 @@ def create_app(config_name='development'):
     else:
         app.config.from_object('app.config.TestingConfig')
 
+    # Configure for reverse proxy (production)
+    if config_name == 'production':
+        from werkzeug.middleware.proxy_fix import ProxyFix
+        app.wsgi_app = ProxyFix(
+            app.wsgi_app,
+            x_for=1,
+            x_proto=1,
+            x_host=1,
+            x_prefix=1
+        )
+
     # Initialize extensions
     login_manager.init_app(app)
     login_manager.login_view = 'auth.login'

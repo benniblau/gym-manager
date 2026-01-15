@@ -11,6 +11,9 @@ class Config:
     DATABASE_PATH = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'exercises.db')
     WTF_CSRF_ENABLED = True
 
+    # External URL for generating absolute URLs (used in production)
+    EXTERNAL_URL = os.environ.get('EXTERNAL_URL')
+
 # Strava API Credentials
     STRAVA_CLIENT_ID = os.environ.get('STRAVA_CLIENT_ID')
     STRAVA_CLIENT_SECRET = os.environ.get('STRAVA_CLIENT_SECRET')
