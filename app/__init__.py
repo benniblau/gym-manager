@@ -19,14 +19,15 @@ def create_app(config_name='development'):
         app.config.from_object('app.config.TestingConfig')
 
     # Configure for reverse proxy (production)
+    # Pangolin -> Traefik -> Flask = 2 proxies
     if config_name == 'production':
         from werkzeug.middleware.proxy_fix import ProxyFix
         app.wsgi_app = ProxyFix(
             app.wsgi_app,
-            x_for=1,
-            x_proto=1,
-            x_host=1,
-            x_prefix=1
+            x_for=2,
+            x_proto=2,
+            x_host=2,
+            x_prefix=2
         )
 
     # Initialize extensions
