@@ -91,58 +91,169 @@
         <!-- Current exercises -->
         <div class="col-md-6 mb-4">
             <div class="card">
-                <div class="card-header">
+                <div class="card-header d-flex justify-content-between align-items-center">
                     <h5 class="mb-0"><i class="fa-solid fa-list-check"></i> Current Exercises ({{ exercises|length }})</h5>
+                    {% if exercises|length >= 2 %}
+                    <button id="toggle-selection-mode" class="btn btn-sm btn-outline-superset" title="Select exercises to create superset">
+                        <i class="fa-solid fa-layer-group"></i> Superset Mode
+                    </button>
+                    {% endif %}
                 </div>
                 <div class="card-body">
+                    <!-- Superset toolbar (hidden until selection mode) -->
+                    <div id="superset-toolbar" class="superset-toolbar" style="display: none;">
+                        <span class="superset-toolbar-label"><i class="fa-solid fa-layer-group"></i> Select 2+ exercises</span>
+                        <span id="selected-count" class="badge bg-secondary">0 selected</span>
+                        <button id="create-superset-btn" class="btn btn-sm btn-superset" disabled>
+                            <i class="fa-solid fa-link"></i> Create Superset
+                        </button>
+                        <button id="cancel-selection-btn" class="btn btn-sm btn-outline-secondary">
+                            <i class="fa-solid fa-xmark"></i> Cancel
+                        </button>
+                    </div>
+
                     {% if exercises %}
                         <div id="current-exercises" class="list-group">
+                            {# Group exercises by superset_group_id #}
+                            {% set ns = namespace(display_num=1, processed_groups=[], last_was_superset=false) %}
                             {% for exercise in exercises %}
-                                <div class="list-group-item" id="exercise-{{ exercise.id }}">
-                                    <div class="d-flex justify-content-between align-items-start">
-                                        <div class="flex-grow-1">
-                                            <h6 class="mb-1">{{ loop.index }}. {{ exercise.exercise_name }}</h6>
-                                            <small class="text-muted">
-                                                {% if exercise.target_sets %}{{ exercise.target_sets }} sets{% endif %}
-                                                {% if exercise.target_reps %} × {{ exercise.target_reps }} reps{% endif %}
-                                                {% if exercise.target_weight %} @ {{ exercise.target_weight }} kg{% endif %}
-                                                {% if exercise.target_duration %} • {{ exercise.target_duration }}s{% endif %}
-                                            </small>
+                                {% if exercise.superset_group_id %}
+                                    {# Check if we already processed this superset group #}
+                                    {% if exercise.superset_group_id not in ns.processed_groups %}
+                                        {% set ns.processed_groups = ns.processed_groups + [exercise.superset_group_id] %}
+                                        {# Collect all exercises in this superset #}
+                                        {% set superset_exercises = exercises|selectattr('superset_group_id', 'equalto', exercise.superset_group_id)|list %}
+
+                                        {# Render superset group container #}
+                                        <div class="superset-group" data-superset-id="{{ exercise.superset_group_id }}">
+                                            <div class="superset-header">
+                                                <span class="superset-label">
+                                                    <i class="fa-solid fa-layer-group"></i> Superset
+                                                </span>
+                                                <div class="superset-controls">
+                                                    <button class="btn btn-sm btn-outline-secondary reorder-superset"
+                                                            data-superset-id="{{ exercise.superset_group_id }}"
+                                                            data-direction="up"
+                                                            title="Move superset up">
+                                                        <i class="fa-solid fa-arrow-up"></i>
+                                                    </button>
+                                                    <button class="btn btn-sm btn-outline-secondary reorder-superset"
+                                                            data-superset-id="{{ exercise.superset_group_id }}"
+                                                            data-direction="down"
+                                                            title="Move superset down">
+                                                        <i class="fa-solid fa-arrow-down"></i>
+                                                    </button>
+                                                    <button class="btn btn-sm btn-outline-danger dissolve-superset"
+                                                            data-superset-id="{{ exercise.superset_group_id }}"
+                                                            title="Dissolve superset">
+                                                        <i class="fa-solid fa-unlink"></i>
+                                                    </button>
+                                                </div>
+                                            </div>
+
+                                            {# Render exercises in this superset with letter suffixes #}
+                                            {% for ss_exercise in superset_exercises %}
+                                                {% set letter = 'abcdefghijklmnopqrstuvwxyz'[loop.index0] %}
+                                                <div class="list-group-item exercise-selectable" id="exercise-{{ ss_exercise.id }}" data-exercise-id="{{ ss_exercise.id }}" data-superset-id="{{ exercise.superset_group_id }}">
+                                                    <div class="d-flex justify-content-between align-items-start">
+                                                        <div class="flex-grow-1">
+                                                            <h6 class="mb-1">
+                                                                <span class="badge badge-superset me-2">{{ ns.display_num }}{{ letter }}</span>
+                                                                {{ ss_exercise.exercise_name }}
+                                                            </h6>
+                                                            <small class="text-muted">
+                                                                {% if ss_exercise.target_sets %}{{ ss_exercise.target_sets }} sets{% endif %}
+                                                                {% if ss_exercise.target_reps %} × {{ ss_exercise.target_reps }} reps{% endif %}
+                                                                {% if ss_exercise.target_weight %} @ {{ ss_exercise.target_weight }} kg{% endif %}
+                                                                {% if ss_exercise.target_duration %} • {{ ss_exercise.target_duration }}s{% endif %}
+                                                            </small>
+                                                        </div>
+                                                        <div class="btn-group" role="group">
+                                                            <button class="btn btn-sm btn-outline-superset btn-touch remove-from-superset"
+                                                                    data-exercise-id="{{ ss_exercise.id }}"
+                                                                    title="Remove from superset">
+                                                                <i class="fa-solid fa-right-from-bracket"></i>
+                                                            </button>
+                                                            <button class="btn btn-sm btn-primary btn-touch edit-exercise"
+                                                                    data-exercise-id="{{ ss_exercise.id }}"
+                                                                    data-exercise-name="{{ ss_exercise.exercise_name }}"
+                                                                    data-target-sets="{{ ss_exercise.target_sets or '' }}"
+                                                                    data-target-reps="{{ ss_exercise.target_reps or '' }}"
+                                                                    data-target-weight="{{ ss_exercise.target_weight or '' }}"
+                                                                    data-target-duration="{{ ss_exercise.target_duration or '' }}"
+                                                                    data-notes="{{ ss_exercise.notes or '' }}"
+                                                                    title="Edit">
+                                                                <i class="fa-solid fa-pencil"></i>
+                                                            </button>
+                                                            <button class="btn btn-sm btn-danger btn-touch remove-exercise"
+                                                                    data-exercise-id="{{ ss_exercise.id }}"
+                                                                    title="Remove">
+                                                                <i class="fa-solid fa-trash"></i>
+                                                            </button>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                                {% if not loop.last %}
+                                                <div class="superset-no-rest">
+                                                    <i class="fa-solid fa-bolt"></i> No rest
+                                                </div>
+                                                {% endif %}
+                                            {% endfor %}
                                         </div>
-                                        <div class="btn-group" role="group">
-                                            <button class="btn btn-sm btn-outline-secondary btn-touch reorder-exercise {% if loop.first %}disabled{% endif %}"
-                                                    data-exercise-id="{{ exercise.id }}"
-                                                    data-direction="up"
-                                                    {% if loop.first %}disabled{% endif %}
-                                                    title="Move up">
-                                                <i class="fa-solid fa-arrow-up"></i>
-                                            </button>
-                                            <button class="btn btn-sm btn-outline-secondary btn-touch reorder-exercise {% if loop.last %}disabled{% endif %}"
-                                                    data-exercise-id="{{ exercise.id }}"
-                                                    data-direction="down"
-                                                    {% if loop.last %}disabled{% endif %}
-                                                    title="Move down">
-                                                <i class="fa-solid fa-arrow-down"></i>
-                                            </button>
-                                            <button class="btn btn-sm btn-primary btn-touch edit-exercise"
-                                                    data-exercise-id="{{ exercise.id }}"
-                                                    data-exercise-name="{{ exercise.exercise_name }}"
-                                                    data-target-sets="{{ exercise.target_sets or '' }}"
-                                                    data-target-reps="{{ exercise.target_reps or '' }}"
-                                                    data-target-weight="{{ exercise.target_weight or '' }}"
-                                                    data-target-duration="{{ exercise.target_duration or '' }}"
-                                                    data-notes="{{ exercise.notes or '' }}"
-                                                    title="Edit">
-                                                <i class="fa-solid fa-pencil"></i>
-                                            </button>
-                                            <button class="btn btn-sm btn-danger btn-touch remove-exercise"
-                                                    data-exercise-id="{{ exercise.id }}"
-                                                    title="Remove">
-                                                <i class="fa-solid fa-trash"></i>
-                                            </button>
+                                        {% set ns.display_num = ns.display_num + 1 %}
+                                        {% set ns.last_was_superset = true %}
+                                    {% endif %}
+                                {% else %}
+                                    {# Standalone exercise #}
+                                    <div class="list-group-item exercise-selectable" id="exercise-{{ exercise.id }}" data-exercise-id="{{ exercise.id }}">
+                                        <div class="d-flex justify-content-between align-items-start">
+                                            <div class="flex-grow-1">
+                                                <h6 class="mb-1">
+                                                    <span class="badge bg-secondary me-2">{{ ns.display_num }}</span>
+                                                    {{ exercise.exercise_name }}
+                                                </h6>
+                                                <small class="text-muted">
+                                                    {% if exercise.target_sets %}{{ exercise.target_sets }} sets{% endif %}
+                                                    {% if exercise.target_reps %} × {{ exercise.target_reps }} reps{% endif %}
+                                                    {% if exercise.target_weight %} @ {{ exercise.target_weight }} kg{% endif %}
+                                                    {% if exercise.target_duration %} • {{ exercise.target_duration }}s{% endif %}
+                                                </small>
+                                            </div>
+                                            <div class="btn-group" role="group">
+                                                <button class="btn btn-sm btn-outline-secondary btn-touch reorder-exercise"
+                                                        data-exercise-id="{{ exercise.id }}"
+                                                        data-direction="up"
+                                                        title="Move up">
+                                                    <i class="fa-solid fa-arrow-up"></i>
+                                                </button>
+                                                <button class="btn btn-sm btn-outline-secondary btn-touch reorder-exercise"
+                                                        data-exercise-id="{{ exercise.id }}"
+                                                        data-direction="down"
+                                                        title="Move down">
+                                                    <i class="fa-solid fa-arrow-down"></i>
+                                                </button>
+                                                <button class="btn btn-sm btn-primary btn-touch edit-exercise"
+                                                        data-exercise-id="{{ exercise.id }}"
+                                                        data-exercise-name="{{ exercise.exercise_name }}"
+                                                        data-target-sets="{{ exercise.target_sets or '' }}"
+                                                        data-target-reps="{{ exercise.target_reps or '' }}"
+                                                        data-target-weight="{{ exercise.target_weight or '' }}"
+                                                        data-target-duration="{{ exercise.target_duration or '' }}"
+                                                        data-notes="{{ exercise.notes or '' }}"
+                                                        title="Edit">
+                                                    <i class="fa-solid fa-pencil"></i>
+                                                </button>
+                                                <button class="btn btn-sm btn-danger btn-touch remove-exercise"
+                                                        data-exercise-id="{{ exercise.id }}"
+                                                        title="Remove">
+                                                    <i class="fa-solid fa-trash"></i>
+                                                </button>
+                                            </div>
                                         </div>
                                     </div>
-                                </div>
+                                    {% set ns.display_num = ns.display_num + 1 %}
+                                    {% set ns.last_was_superset = false %}
+                                {% endif %}
                             {% endfor %}
                         </div>
                     {% else %}
@@ -275,4 +386,212 @@
 {% include 'includes/exercise_details_modal.html' %}
 
 <script src="{{ url_for('static', filename='js/workout-edit.js') }}"></script>
+
+<script>
+// ===== SUPERSET FUNCTIONS FOR TEMPLATES =====
+const templateId = {{ workout.id }};
+let selectionMode = false;
+let selectedExercises = new Set();
+
+// Toggle selection mode for creating supersets
+const toggleSelectionBtn = document.getElementById('toggle-selection-mode');
+const supersetToolbar = document.getElementById('superset-toolbar');
+const createSupersetBtn = document.getElementById('create-superset-btn');
+const cancelSelectionBtn = document.getElementById('cancel-selection-btn');
+const selectedCountBadge = document.getElementById('selected-count');
+
+if (toggleSelectionBtn) {
+    toggleSelectionBtn.addEventListener('click', function() {
+        selectionMode = !selectionMode;
+        if (selectionMode) {
+            enterSelectionMode();
+        } else {
+            exitSelectionMode();
+        }
+    });
+}
+
+if (cancelSelectionBtn) {
+    cancelSelectionBtn.addEventListener('click', function() {
+        exitSelectionMode();
+    });
+}
+
+function enterSelectionMode() {
+    selectionMode = true;
+    selectedExercises.clear();
+    supersetToolbar.style.display = 'flex';
+    toggleSelectionBtn.classList.add('active');
+    toggleSelectionBtn.innerHTML = '<i class="fa-solid fa-check"></i> Done';
+
+    // Add click listeners to exercise items (only standalone ones, not already in superset)
+    document.querySelectorAll('.exercise-selectable').forEach(item => {
+        if (!item.dataset.supersetId) {
+            item.addEventListener('click', handleExerciseSelection);
+            item.style.cursor = 'pointer';
+        }
+    });
+
+    updateSelectedCount();
+}
+
+function exitSelectionMode() {
+    selectionMode = false;
+    selectedExercises.clear();
+    supersetToolbar.style.display = 'none';
+    toggleSelectionBtn.classList.remove('active');
+    toggleSelectionBtn.innerHTML = '<i class="fa-solid fa-layer-group"></i> Superset Mode';
+
+    // Remove selection styling and listeners
+    document.querySelectorAll('.exercise-selectable').forEach(item => {
+        item.classList.remove('selected');
+        item.removeEventListener('click', handleExerciseSelection);
+        item.style.cursor = '';
+    });
+}
+
+function handleExerciseSelection(e) {
+    // Don't select if clicking on buttons
+    if (e.target.closest('button') || e.target.closest('.btn-group')) return;
+
+    const exerciseId = this.dataset.exerciseId;
+    if (selectedExercises.has(exerciseId)) {
+        selectedExercises.delete(exerciseId);
+        this.classList.remove('selected');
+    } else {
+        selectedExercises.add(exerciseId);
+        this.classList.add('selected');
+    }
+    updateSelectedCount();
+}
+
+function updateSelectedCount() {
+    const count = selectedExercises.size;
+    selectedCountBadge.textContent = `${count} selected`;
+
+    if (count >= 2) {
+        createSupersetBtn.disabled = false;
+        selectedCountBadge.classList.remove('bg-secondary');
+        selectedCountBadge.classList.add('bg-success');
+    } else {
+        createSupersetBtn.disabled = true;
+        selectedCountBadge.classList.remove('bg-success');
+        selectedCountBadge.classList.add('bg-secondary');
+    }
+}
+
+// Create superset from selected exercises
+if (createSupersetBtn) {
+    createSupersetBtn.addEventListener('click', async function() {
+        if (selectedExercises.size < 2) return;
+
+        const formData = new FormData();
+        selectedExercises.forEach(id => {
+            formData.append('exercise_ids[]', id);
+        });
+
+        try {
+            const response = await fetch(`/templates/${templateId}/superset/create`, {
+                method: 'POST',
+                body: formData
+            });
+
+            const data = await response.json();
+
+            if (data.success) {
+                location.reload();
+            } else {
+                alert(data.error || 'Failed to create superset');
+            }
+        } catch (error) {
+            console.error('Error creating superset:', error);
+            alert('Failed to create superset. Please try again.');
+        }
+    });
+}
+
+// Dissolve superset
+document.querySelectorAll('.dissolve-superset').forEach(btn => {
+    btn.addEventListener('click', async function() {
+        if (!confirm('Dissolve this superset? Exercises will become standalone.')) return;
+
+        const supersetId = this.dataset.supersetId;
+
+        try {
+            const response = await fetch(`/templates/${templateId}/superset/${supersetId}/dissolve`, {
+                method: 'POST'
+            });
+
+            const data = await response.json();
+
+            if (data.success) {
+                location.reload();
+            } else {
+                alert(data.error || 'Failed to dissolve superset');
+            }
+        } catch (error) {
+            console.error('Error dissolving superset:', error);
+            alert('Failed to dissolve superset. Please try again.');
+        }
+    });
+});
+
+// Remove exercise from superset
+document.querySelectorAll('.remove-from-superset').forEach(btn => {
+    btn.addEventListener('click', async function() {
+        const exerciseId = this.dataset.exerciseId;
+
+        try {
+            const response = await fetch(`/templates/${templateId}/exercises/${exerciseId}/remove-from-superset`, {
+                method: 'POST'
+            });
+
+            const data = await response.json();
+
+            if (data.success) {
+                location.reload();
+            } else {
+                alert(data.error || 'Failed to remove from superset');
+            }
+        } catch (error) {
+            console.error('Error removing from superset:', error);
+            alert('Failed to remove from superset. Please try again.');
+        }
+    });
+});
+
+// Reorder superset (move entire group)
+document.querySelectorAll('.reorder-superset').forEach(btn => {
+    btn.addEventListener('click', async function() {
+        const supersetId = this.dataset.supersetId;
+        const direction = this.dataset.direction;
+
+        // Get the first exercise in the superset to use for reordering
+        const supersetGroup = document.querySelector(`.superset-group[data-superset-id="${supersetId}"]`);
+        const firstExercise = supersetGroup.querySelector('.list-group-item');
+        if (!firstExercise) return;
+
+        const exerciseId = firstExercise.dataset.exerciseId;
+
+        try {
+            const formData = new FormData();
+            formData.append('direction', direction);
+
+            const response = await fetch(`/workouts/${templateId}/exercises/${exerciseId}/reorder`, {
+                method: 'POST',
+                body: formData
+            });
+
+            const data = await response.json();
+
+            if (data.success) {
+                location.reload();
+            }
+        } catch (error) {
+            console.error('Error reordering superset:', error);
+            alert('Failed to reorder superset. Please try again.');
+        }
+    });
+});
+</script>
 {% endblock %}

@@ -532,7 +532,7 @@ class Workout:
             notes=notes  # Notes should be pre-set by caller (with template notes as fallback)
         )
 
-        # Copy exercises from template
+        # Copy exercises from template (including superset groupings)
         template_exercises = template.get_exercises()
         for ex in template_exercises:
             WorkoutExercise.add_to_workout(
@@ -543,7 +543,8 @@ class Workout:
                 target_reps=ex['target_reps'],
                 target_weight=ex['target_weight'],
                 target_duration=ex['target_duration'],
-                notes=ex['notes']
+                notes=ex['notes'],
+                superset_group_id=ex.get('superset_group_id')
             )
 
         # Increment usage count
@@ -685,15 +686,16 @@ class WorkoutExercise:
         db = get_db()
         cursor = db.execute('''
             INSERT INTO workout_exercises
-            (workout_id, exercise_id, order_position, target_sets, target_reps, target_weight, target_duration, notes)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            (workout_id, exercise_id, order_position, target_sets, target_reps, target_weight, target_duration, notes, superset_group_id)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
         ''', (
             workout_id, exercise_id, order_position,
             kwargs.get('target_sets'),
             kwargs.get('target_reps'),
             kwargs.get('target_weight'),
             kwargs.get('target_duration'),
-            kwargs.get('notes')
+            kwargs.get('notes'),
+            kwargs.get('superset_group_id')
         ))
         db.commit()
         return cursor.lastrowid
@@ -792,6 +794,199 @@ class WorkoutExercise:
             WHERE id = ?
         ''', (current_pos, swap_exercise['id']))
 
+        db.commit()
+
+    # ===== SUPERSET METHODS =====
+
+    @staticmethod
+    def get_next_superset_group_id(workout_id):
+        """Get the next available superset group ID for a workout"""
+        db = get_db()
+        row = db.execute('''
+            SELECT MAX(superset_group_id) as max_group
+            FROM workout_exercises
+            WHERE workout_id = ?
+        ''', (workout_id,)).fetchone()
+        return (row['max_group'] or 0) + 1
+
+    @staticmethod
+    def create_superset(workout_exercise_ids):
+        """Group exercises into a superset"""
+        if len(workout_exercise_ids) < 2:
+            raise ValueError("Superset requires at least 2 exercises")
+
+        db = get_db()
+
+        # Get workout_id from first exercise
+        first = db.execute(
+            'SELECT workout_id FROM workout_exercises WHERE id = ?',
+            (workout_exercise_ids[0],)
+        ).fetchone()
+
+        if not first:
+            raise ValueError("Exercise not found")
+
+        workout_id = first['workout_id']
+
+        # Verify all exercises belong to same workout and are not already in a superset
+        for ex_id in workout_exercise_ids:
+            row = db.execute(
+                'SELECT workout_id, superset_group_id FROM workout_exercises WHERE id = ?',
+                (ex_id,)
+            ).fetchone()
+            if not row or row['workout_id'] != workout_id:
+                raise ValueError("All exercises must belong to the same workout")
+            if row['superset_group_id']:
+                raise ValueError("Exercise is already in a superset")
+
+        # Get next group ID
+        group_id = WorkoutExercise.get_next_superset_group_id(workout_id)
+
+        # Assign group ID to all exercises
+        for ex_id in workout_exercise_ids:
+            db.execute('''
+                UPDATE workout_exercises
+                SET superset_group_id = ?
+                WHERE id = ?
+            ''', (group_id, ex_id))
+
+        # Ensure exercises are consecutive in order
+        WorkoutExercise._consolidate_superset_order(workout_id, group_id)
+
+        db.commit()
+        return group_id
+
+    @staticmethod
+    def _consolidate_superset_order(workout_id, superset_group_id):
+        """Ensure superset exercises are consecutive in order"""
+        db = get_db()
+
+        # Get all exercises in the superset
+        superset_exercises = db.execute('''
+            SELECT id, order_position FROM workout_exercises
+            WHERE workout_id = ? AND superset_group_id = ?
+            ORDER BY order_position
+        ''', (workout_id, superset_group_id)).fetchall()
+
+        if not superset_exercises:
+            return
+
+        # Get the minimum position in the superset
+        min_pos = min(ex['order_position'] for ex in superset_exercises)
+
+        # Get exercises not in this superset that need to be shifted
+        non_superset_in_range = db.execute('''
+            SELECT id, order_position FROM workout_exercises
+            WHERE workout_id = ? AND (superset_group_id IS NULL OR superset_group_id != ?)
+            AND order_position >= ? AND order_position <= ?
+            ORDER BY order_position
+        ''', (workout_id, superset_group_id, min_pos,
+              max(ex['order_position'] for ex in superset_exercises))).fetchall()
+
+        # Move superset exercises to consecutive positions starting at min_pos
+        for i, ex in enumerate(superset_exercises):
+            new_pos = min_pos + i
+            if ex['order_position'] != new_pos:
+                db.execute('''
+                    UPDATE workout_exercises SET order_position = ?
+                    WHERE id = ?
+                ''', (new_pos, ex['id']))
+
+        # Shift non-superset exercises after the superset group
+        next_pos = min_pos + len(superset_exercises)
+        for ex in non_superset_in_range:
+            db.execute('''
+                UPDATE workout_exercises SET order_position = ?
+                WHERE id = ?
+            ''', (next_pos, ex['id']))
+            next_pos += 1
+
+    @staticmethod
+    def add_to_superset(workout_exercise_id, superset_group_id):
+        """Add an exercise to an existing superset"""
+        db = get_db()
+
+        # Get the exercise and its workout
+        exercise = db.execute(
+            'SELECT workout_id, order_position, superset_group_id FROM workout_exercises WHERE id = ?',
+            (workout_exercise_id,)
+        ).fetchone()
+
+        if not exercise:
+            raise ValueError("Exercise not found")
+
+        if exercise['superset_group_id']:
+            raise ValueError("Exercise is already in a superset")
+
+        # Verify superset exists in this workout
+        existing = db.execute('''
+            SELECT MIN(order_position) as min_pos, MAX(order_position) as max_pos
+            FROM workout_exercises
+            WHERE workout_id = ? AND superset_group_id = ?
+        ''', (exercise['workout_id'], superset_group_id)).fetchone()
+
+        if existing['min_pos'] is None:
+            raise ValueError("Superset group not found")
+
+        # Update the exercise's superset_group_id
+        db.execute('''
+            UPDATE workout_exercises
+            SET superset_group_id = ?
+            WHERE id = ?
+        ''', (superset_group_id, workout_exercise_id))
+
+        # Consolidate order
+        WorkoutExercise._consolidate_superset_order(
+            exercise['workout_id'],
+            superset_group_id
+        )
+
+        db.commit()
+
+    @staticmethod
+    def remove_from_superset(workout_exercise_id):
+        """Remove an exercise from its superset"""
+        db = get_db()
+
+        # Get exercise info
+        exercise = db.execute('''
+            SELECT workout_id, superset_group_id FROM workout_exercises WHERE id = ?
+        ''', (workout_exercise_id,)).fetchone()
+
+        if not exercise or not exercise['superset_group_id']:
+            return  # Not in a superset
+
+        workout_id = exercise['workout_id']
+        group_id = exercise['superset_group_id']
+
+        # Remove from superset
+        db.execute('''
+            UPDATE workout_exercises SET superset_group_id = NULL WHERE id = ?
+        ''', (workout_exercise_id,))
+
+        # Check if superset now has only 1 member
+        remaining = db.execute('''
+            SELECT COUNT(*) as count FROM workout_exercises
+            WHERE workout_id = ? AND superset_group_id = ?
+        ''', (workout_id, group_id)).fetchone()
+
+        # If only 1 exercise left, dissolve the superset
+        if remaining['count'] == 1:
+            db.execute('''
+                UPDATE workout_exercises SET superset_group_id = NULL
+                WHERE workout_id = ? AND superset_group_id = ?
+            ''', (workout_id, group_id))
+
+        db.commit()
+
+    @staticmethod
+    def dissolve_superset(workout_id, superset_group_id):
+        """Dissolve a superset (remove all exercises from it)"""
+        db = get_db()
+        db.execute('''
+            UPDATE workout_exercises SET superset_group_id = NULL
+            WHERE workout_id = ? AND superset_group_id = ?
+        ''', (workout_id, superset_group_id))
         db.commit()
 
 

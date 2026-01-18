@@ -492,3 +492,52 @@ def export_tcx(workout_id):
     response.headers['Content-Disposition'] = f'attachment; filename="{workout.name.replace(" ", "_")}_{workout.id}.tcx"'
 
     return response
+
+
+# ===== SUPERSET ROUTES =====
+
+@workouts_bp.route('/<int:workout_id>/superset/create', methods=['POST'])
+@login_required
+def create_superset(workout_id):
+    """Create a superset from selected exercises (AJAX endpoint)"""
+    workout = Workout.get_by_id(workout_id)
+
+    if not workout or workout.user_id != current_user.id:
+        return jsonify({'error': 'Unauthorized'}), 403
+
+    exercise_ids = request.form.getlist('exercise_ids[]', type=int)
+
+    if len(exercise_ids) < 2:
+        return jsonify({'error': 'Select at least 2 exercises'}), 400
+
+    try:
+        group_id = WorkoutExercise.create_superset(exercise_ids)
+        return jsonify({'success': True, 'superset_group_id': group_id})
+    except ValueError as e:
+        return jsonify({'error': str(e)}), 400
+
+
+@workouts_bp.route('/<int:workout_id>/superset/<int:group_id>/dissolve', methods=['POST'])
+@login_required
+def dissolve_superset(workout_id, group_id):
+    """Dissolve a superset entirely (AJAX endpoint)"""
+    workout = Workout.get_by_id(workout_id)
+
+    if not workout or workout.user_id != current_user.id:
+        return jsonify({'error': 'Unauthorized'}), 403
+
+    WorkoutExercise.dissolve_superset(workout_id, group_id)
+    return jsonify({'success': True})
+
+
+@workouts_bp.route('/<int:workout_id>/exercises/<int:workout_exercise_id>/remove-from-superset', methods=['POST'])
+@login_required
+def remove_from_superset(workout_id, workout_exercise_id):
+    """Remove exercise from its superset (AJAX endpoint)"""
+    workout = Workout.get_by_id(workout_id)
+
+    if not workout or workout.user_id != current_user.id:
+        return jsonify({'error': 'Unauthorized'}), 403
+
+    WorkoutExercise.remove_from_superset(workout_exercise_id)
+    return jsonify({'success': True})

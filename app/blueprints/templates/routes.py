@@ -1,4 +1,4 @@
-from flask import render_template, redirect, url_for, flash, request, abort
+from flask import render_template, redirect, url_for, flash, request, abort, jsonify
 from flask_login import login_required, current_user
 from datetime import datetime, date, timedelta
 from app.models import Workout, WorkoutExercise, Exercise
@@ -225,3 +225,52 @@ def toggle_privacy(template_id):
         flash(str(e), 'danger')
 
     return redirect(request.referrer or url_for('templates.detail', template_id=template_id))
+
+
+# ===== SUPERSET ROUTES =====
+
+@templates_bp.route('/<int:template_id>/superset/create', methods=['POST'])
+@login_required
+def create_superset(template_id):
+    """Create a superset from selected exercises (AJAX endpoint)"""
+    template = Workout.get_by_id(template_id)
+
+    if not template or template.user_id != current_user.id or not template.is_template:
+        return jsonify({'error': 'Unauthorized'}), 403
+
+    exercise_ids = request.form.getlist('exercise_ids[]', type=int)
+
+    if len(exercise_ids) < 2:
+        return jsonify({'error': 'Select at least 2 exercises'}), 400
+
+    try:
+        group_id = WorkoutExercise.create_superset(exercise_ids)
+        return jsonify({'success': True, 'superset_group_id': group_id})
+    except ValueError as e:
+        return jsonify({'error': str(e)}), 400
+
+
+@templates_bp.route('/<int:template_id>/superset/<int:group_id>/dissolve', methods=['POST'])
+@login_required
+def dissolve_superset(template_id, group_id):
+    """Dissolve a superset entirely (AJAX endpoint)"""
+    template = Workout.get_by_id(template_id)
+
+    if not template or template.user_id != current_user.id or not template.is_template:
+        return jsonify({'error': 'Unauthorized'}), 403
+
+    WorkoutExercise.dissolve_superset(template_id, group_id)
+    return jsonify({'success': True})
+
+
+@templates_bp.route('/<int:template_id>/exercises/<int:workout_exercise_id>/remove-from-superset', methods=['POST'])
+@login_required
+def remove_from_superset(template_id, workout_exercise_id):
+    """Remove exercise from its superset (AJAX endpoint)"""
+    template = Workout.get_by_id(template_id)
+
+    if not template or template.user_id != current_user.id or not template.is_template:
+        return jsonify({'error': 'Unauthorized'}), 403
+
+    WorkoutExercise.remove_from_superset(workout_exercise_id)
+    return jsonify({'success': True})

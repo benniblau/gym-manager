@@ -115,8 +115,37 @@ def get_category_emoji(category_name):
     return category_emojis.get(category_name.lower() if category_name else '', '🏋️')
 
 
+def format_exercise_line(exercise, number_prefix):
+    """Format a single exercise line with emoji and details"""
+    category_name = exercise.get('category_name')
+    emoji = get_category_emoji(category_name)
+    parts = [f"{number_prefix}.", emoji, exercise['exercise_name']]
+
+    # Use actual values if available, otherwise target values
+    sets = exercise.get('actual_sets') or exercise.get('target_sets')
+    reps = exercise.get('actual_reps') or exercise.get('target_reps')
+    weight = exercise.get('actual_weight') or exercise.get('target_weight')
+
+    if sets or reps or weight:
+        details = []
+        if sets and reps:
+            details.append(f"{sets}x{reps}")
+        elif sets:
+            details.append(f"{sets} sets")
+        elif reps:
+            details.append(f"{reps} reps")
+
+        if weight:
+            details.append(f"@{weight}kg")
+
+        if details:
+            parts.append(' '.join(details))
+
+    return ' '.join(parts)
+
+
 def format_workout_description(workout, exercises):
-    """Format workout exercises into Strava description with emojis"""
+    """Format workout exercises into Strava description with emojis and superset grouping"""
     lines = []
 
     # Add workout notes/description if present
@@ -126,34 +155,42 @@ def format_workout_description(workout, exercises):
         lines.append('---')
         lines.append('')
 
-    # Add each exercise
+    # Group exercises, tracking supersets
+    display_num = 1
+    processed_groups = set()
+    superset_count = 0
+
     for exercise in exercises:
-        # Get category-specific emoji
-        category_name = exercise.get('category_name')
-        emoji = get_category_emoji(category_name)
-        parts = [emoji, exercise['exercise_name']]
+        superset_id = exercise.get('superset_group_id')
 
-        # Use actual values if available, otherwise target values
-        sets = exercise.get('actual_sets') or exercise.get('target_sets')
-        reps = exercise.get('actual_reps') or exercise.get('target_reps')
-        weight = exercise.get('actual_weight') or exercise.get('target_weight')
+        if superset_id:
+            # Check if we already processed this superset
+            if superset_id in processed_groups:
+                continue
 
-        if sets or reps or weight:
-            details = []
-            if sets and reps:
-                details.append(f"{sets}x{reps}")
-            elif sets:
-                details.append(f"{sets} sets")
-            elif reps:
-                details.append(f"{reps} reps")
+            processed_groups.add(superset_id)
 
-            if weight:
-                details.append(f"@{weight}kg")
+            # Collect all exercises in this superset
+            superset_exercises = [e for e in exercises if e.get('superset_group_id') == superset_id]
+            superset_count += 1
 
-            if details:
-                parts.append(' '.join(details))
+            # Add superset header
+            lines.append(f'🔗 SUPERSET (no rest between):')
 
-        lines.append(' '.join(parts))
+            # Add each exercise in the superset with letter suffix
+            letters = 'abcdefghijklmnopqrstuvwxyz'
+            for idx, ss_exercise in enumerate(superset_exercises):
+                letter = letters[idx] if idx < len(letters) else str(idx + 1)
+                line = format_exercise_line(ss_exercise, f"{display_num}{letter}")
+                lines.append(f"   {line}")
+
+            lines.append('')  # Blank line after superset
+            display_num += 1
+        else:
+            # Standalone exercise
+            line = format_exercise_line(exercise, str(display_num))
+            lines.append(line)
+            display_num += 1
 
     # Add footer with stats
     lines.append('')
@@ -168,6 +205,8 @@ def format_workout_description(workout, exercises):
 
     lines.append(f'⏱️ Duration: {duration_str}')
     lines.append(f'📊 {len(exercises)} exercises completed')
+    if superset_count > 0:
+        lines.append(f'🔗 {superset_count} superset{"s" if superset_count > 1 else ""} performed')
 
     return '\n'.join(lines)
 
