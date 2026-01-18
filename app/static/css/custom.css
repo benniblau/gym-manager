@@ -1,5 +1,288 @@
 /* Mobile-first custom styles for Gym Manager */
 
+/* ===== ARISE BRAND COLOR SYSTEM ===== */
+/* All colors derived from ARISE.svg gradients */
+/* Purples: #4f068a, #6e068e, #720a8d, #7d147d, #8e04dd, #7a09b3, #6f1261 */
+/* Warm tones: #7b1c5e, #f9826d, #fc9773, #ec766f */
+
+:root, [data-bs-theme="dark"] {
+    /* Primary - ARISE purple */
+    --bs-primary: #7a09b3;
+    --bs-primary-rgb: 122, 9, 179;
+
+    /* Secondary - Dark purple */
+    --bs-secondary: #4f068a;
+    --bs-secondary-rgb: 79, 6, 138;
+
+    /* Success - Peach (warm positive) */
+    --bs-success: #fc9773;
+    --bs-success-rgb: 252, 151, 115;
+
+    /* Danger - Magenta */
+    --bs-danger: #7b1c5e;
+    --bs-danger-rgb: 123, 28, 94;
+
+    /* Warning - Coral */
+    --bs-warning: #f9826d;
+    --bs-warning-rgb: 249, 130, 109;
+
+    /* Info - Bright purple */
+    --bs-info: #8e04dd;
+    --bs-info-rgb: 142, 4, 221;
+
+    /* Link colors - Light coral from palette */
+    --bs-link-color: #ec766f;
+    --bs-link-hover-color: #fc9773;
+}
+
+/* ===== BOOTSTRAP BUTTON OVERRIDES ===== */
+
+.btn-primary {
+    --bs-btn-bg: #7a09b3;
+    --bs-btn-border-color: #7a09b3;
+    --bs-btn-hover-bg: #6e068e;
+    --bs-btn-hover-border-color: #6e068e;
+    --bs-btn-active-bg: #4f068a;
+    --bs-btn-active-border-color: #4f068a;
+    --bs-btn-disabled-bg: #7a09b3;
+    --bs-btn-disabled-border-color: #7a09b3;
+}
+
+.btn-outline-primary {
+    --bs-btn-color: #7a09b3;
+    --bs-btn-border-color: #7a09b3;
+    --bs-btn-hover-bg: #7a09b3;
+    --bs-btn-hover-border-color: #7a09b3;
+    --bs-btn-active-bg: #6e068e;
+    --bs-btn-active-border-color: #6e068e;
+}
+
+.btn-secondary {
+    --bs-btn-bg: #4f068a;
+    --bs-btn-border-color: #4f068a;
+    --bs-btn-hover-bg: #6f1261;
+    --bs-btn-hover-border-color: #6f1261;
+    --bs-btn-active-bg: #6f1261;
+    --bs-btn-active-border-color: #6f1261;
+}
+
+.btn-outline-secondary {
+    --bs-btn-color: #720a8d;
+    --bs-btn-border-color: #720a8d;
+    --bs-btn-hover-bg: #720a8d;
+    --bs-btn-hover-border-color: #720a8d;
+    --bs-btn-hover-color: #fff;
+}
+
+.btn-success {
+    --bs-btn-bg: #fc9773;
+    --bs-btn-border-color: #fc9773;
+    --bs-btn-hover-bg: #ec766f;
+    --bs-btn-hover-border-color: #ec766f;
+    --bs-btn-active-bg: #f9826d;
+    --bs-btn-active-border-color: #f9826d;
+    --bs-btn-color: #000;
+    --bs-btn-hover-color: #000;
+}
+
+.btn-outline-success {
+    --bs-btn-color: #fc9773;
+    --bs-btn-border-color: #fc9773;
+    --bs-btn-hover-bg: #fc9773;
+    --bs-btn-hover-border-color: #fc9773;
+    --bs-btn-hover-color: #000;
+}
+
+.btn-danger {
+    --bs-btn-bg: #7b1c5e;
+    --bs-btn-border-color: #7b1c5e;
+    --bs-btn-hover-bg: #6f1261;
+    --bs-btn-hover-border-color: #6f1261;
+    --bs-btn-active-bg: #6f1261;
+    --bs-btn-active-border-color: #6f1261;
+}
+
+.btn-outline-danger {
+    --bs-btn-color: #7b1c5e;
+    --bs-btn-border-color: #7b1c5e;
+    --bs-btn-hover-bg: #7b1c5e;
+    --bs-btn-hover-border-color: #7b1c5e;
+}
+
+.btn-warning {
+    --bs-btn-bg: #f9826d;
+    --bs-btn-border-color: #f9826d;
+    --bs-btn-hover-bg: #ec766f;
+    --bs-btn-hover-border-color: #ec766f;
+    --bs-btn-color: #000;
+    --bs-btn-hover-color: #000;
+}
+
+.btn-outline-warning {
+    --bs-btn-color: #f9826d;
+    --bs-btn-border-color: #f9826d;
+    --bs-btn-hover-bg: #f9826d;
+    --bs-btn-hover-border-color: #f9826d;
+    --bs-btn-hover-color: #000;
+}
+
+.btn-info {
+    --bs-btn-bg: #8e04dd;
+    --bs-btn-border-color: #8e04dd;
+    --bs-btn-hover-bg: #7a09b3;
+    --bs-btn-hover-border-color: #7a09b3;
+    --bs-btn-color: #fff;
+    --bs-btn-hover-color: #fff;
+}
+
+.btn-outline-info {
+    --bs-btn-color: #8e04dd;
+    --bs-btn-border-color: #8e04dd;
+    --bs-btn-hover-bg: #8e04dd;
+    --bs-btn-hover-border-color: #8e04dd;
+    --bs-btn-hover-color: #fff;
+}
+
+/* ===== BOOTSTRAP BADGE OVERRIDES ===== */
+
+.bg-primary {
+    background-color: #7a09b3 !important;
+}
+
+.bg-secondary {
+    background-color: #4f068a !important;
+}
+
+.bg-success {
+    background-color: #fc9773 !important;
+    color: #000 !important;
+}
+
+.bg-danger {
+    background-color: #7b1c5e !important;
+}
+
+.bg-warning {
+    background-color: #f9826d !important;
+    color: #000 !important;
+}
+
+.bg-info {
+    background-color: #8e04dd !important;
+}
+
+/* ===== BOOTSTRAP TEXT COLOR OVERRIDES ===== */
+
+.text-primary {
+    color: #7a09b3 !important;
+}
+
+.text-secondary {
+    color: #720a8d !important;
+}
+
+.text-success {
+    color: #fc9773 !important;
+}
+
+.text-danger {
+    color: #7b1c5e !important;
+}
+
+.text-warning {
+    color: #f9826d !important;
+}
+
+.text-info {
+    color: #8e04dd !important;
+}
+
+/* ===== BOOTSTRAP ALERT OVERRIDES ===== */
+
+.alert-primary {
+    --bs-alert-bg: rgba(122, 9, 179, 0.15);
+    --bs-alert-border-color: #7a09b3;
+    --bs-alert-color: #7a09b3;
+}
+
+.alert-secondary {
+    --bs-alert-bg: rgba(79, 6, 138, 0.15);
+    --bs-alert-border-color: #4f068a;
+    --bs-alert-color: #720a8d;
+}
+
+.alert-success {
+    --bs-alert-bg: rgba(252, 151, 115, 0.15);
+    --bs-alert-border-color: #fc9773;
+    --bs-alert-color: #fc9773;
+}
+
+.alert-danger {
+    --bs-alert-bg: rgba(123, 28, 94, 0.15);
+    --bs-alert-border-color: #7b1c5e;
+    --bs-alert-color: #7b1c5e;
+}
+
+.alert-warning {
+    --bs-alert-bg: rgba(249, 130, 109, 0.15);
+    --bs-alert-border-color: #f9826d;
+    --bs-alert-color: #f9826d;
+}
+
+.alert-info {
+    --bs-alert-bg: rgba(142, 4, 221, 0.15);
+    --bs-alert-border-color: #8e04dd;
+    --bs-alert-color: #8e04dd;
+}
+
+/* ===== BOOTSTRAP BORDER OVERRIDES ===== */
+
+.border-primary {
+    border-color: #7a09b3 !important;
+}
+
+.border-secondary {
+    border-color: #4f068a !important;
+}
+
+.border-success {
+    border-color: #fc9773 !important;
+}
+
+.border-danger {
+    border-color: #7b1c5e !important;
+}
+
+.border-warning {
+    border-color: #f9826d !important;
+}
+
+.border-info {
+    border-color: #8e04dd !important;
+}
+
+/* ===== BOOTSTRAP PROGRESS BAR OVERRIDES ===== */
+
+.progress-bar.bg-primary {
+    background-color: #7a09b3 !important;
+}
+
+.progress-bar.bg-success {
+    background-color: #fc9773 !important;
+}
+
+.progress-bar.bg-info {
+    background-color: #8e04dd !important;
+}
+
+.progress-bar.bg-warning {
+    background-color: #f9826d !important;
+}
+
+.progress-bar.bg-danger {
+    background-color: #7b1c5e !important;
+}
+
 /* Large touch targets (minimum 44x44px for mobile) */
 .btn-touch {
     min-height: 48px;
@@ -164,11 +447,11 @@ input[type=number] {
     animation: checkmark 0.3s ease;
 }
 
-/* Focus states for accessibility */
+/* Focus states for accessibility - ARISE purple */
 .form-control:focus,
 .form-select:focus,
 .btn:focus {
-    box-shadow: 0 0 0 0.25rem rgba(13, 110, 253, 0.5);
+    box-shadow: 0 0 0 0.25rem rgba(122, 9, 179, 0.5);
 }
 
 /* Dark theme optimizations */
@@ -177,13 +460,13 @@ body {
     color: #f8f9fa;
 }
 
-/* Link colors for dark theme */
+/* Link colors for dark theme - ARISE salmon/peach */
 a {
-    color: #6ea8fe;
+    color: #ec766f;
 }
 
 a:hover {
-    color: #8bb9fe;
+    color: #fc9773;
 }
 
 /* Table styles for dark theme */
@@ -221,8 +504,8 @@ table {
 }
 
 .pagination .page-item.active .page-link {
-    background-color: var(--bs-primary);
-    border-color: var(--bs-primary);
+    background-color: #7a09b3;
+    border-color: #7a09b3;
 }
 
 /* Dropdown menu dark theme */
@@ -246,18 +529,19 @@ table {
     background-color: rgba(33, 37, 41, 0.95) !important;
 }
 
-/* Workout status badges */
+/* Workout status badges - ARISE palette */
 .badge.bg-planned {
-    background-color: #6c757d !important;
+    background-color: #4f068a !important;  /* ARISE dark purple */
 }
 
 .badge.bg-in-progress {
-    background-color: #ffc107 !important;
+    background-color: #f9826d !important;  /* ARISE coral */
     color: #000 !important;
 }
 
 .badge.bg-completed {
-    background-color: #198754 !important;
+    background-color: #fc9773 !important;  /* ARISE peach */
+    color: #000 !important;
 }
 
 /* Smooth scrolling */
@@ -265,7 +549,7 @@ html {
     scroll-behavior: smooth;
 }
 
-/* Custom scrollbar for dark theme */
+/* Custom scrollbar for dark theme - ARISE palette */
 ::-webkit-scrollbar {
     width: 10px;
     height: 10px;
@@ -276,12 +560,12 @@ html {
 }
 
 ::-webkit-scrollbar-thumb {
-    background: #495057;
+    background: #4f068a;  /* ARISE dark purple */
     border-radius: 5px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-    background: #6c757d;
+    background: #7a09b3;  /* ARISE primary purple */
 }
 
 /* ===== STRAVA BRAND UTILITIES ===== */
@@ -329,35 +613,35 @@ html {
 }
 
 /* ===== EXERCISE METADATA BADGES ===== */
-/* Standardized color system for exercise information */
+/* ARISE brand color system for exercise information */
 
 .badge-category {
-    background-color: #0d6efd !important;  /* Primary blue */
+    background-color: #7a09b3 !important;  /* ARISE primary purple */
     color: white !important;
 }
 
 .badge-muscle-primary {
-    background-color: #dc3545 !important;  /* Red for primary muscles */
+    background-color: #7b1c5e !important;  /* ARISE magenta */
     color: white !important;
 }
 
 .badge-muscle-secondary {
-    background-color: #fd7e14 !important;  /* Orange for secondary muscles */
+    background-color: #f9826d !important;  /* ARISE coral */
     color: white !important;
 }
 
 .badge-equipment {
-    background-color: #6c757d !important;  /* Gray for equipment */
+    background-color: #6f1261 !important;  /* ARISE dark magenta */
     color: white !important;
 }
 
 .badge-target {
-    background-color: #198754 !important;  /* Green for target values */
+    background-color: #6e068e !important;  /* ARISE deep purple */
     color: white !important;
 }
 
 .badge-actual {
-    background-color: #0dcaf0 !important;  /* Cyan for actual logged values */
+    background-color: #fc9773 !important;  /* ARISE peach */
     color: white !important;
 }
 
@@ -546,8 +830,8 @@ h6 i[class*=" fa-"] {
 
 /* Superset container - groups exercises visually */
 .superset-group {
-    border-left: 4px solid #6f42c1;  /* Purple accent */
-    background-color: rgba(111, 66, 193, 0.1);
+    border-left: 4px solid #7a09b3;  /* Purple accent */
+    background-color: rgba(122, 9, 179, 0.1);
     border-radius: 0.5rem;
     margin-bottom: 1rem;
     padding: 0.75rem;
@@ -561,13 +845,13 @@ h6 i[class*=" fa-"] {
     align-items: center;
     margin-bottom: 0.75rem;
     padding-bottom: 0.5rem;
-    border-bottom: 1px solid rgba(111, 66, 193, 0.3);
+    border-bottom: 1px solid rgba(122, 9, 179, 0.3);
 }
 
 /* "Superset" label */
 .superset-label {
     font-weight: 600;
-    color: #6f42c1;
+    color: #7a09b3;
     font-size: 0.9rem;
     display: flex;
     align-items: center;
@@ -586,34 +870,34 @@ h6 i[class*=" fa-"] {
 
 /* Purple badge for superset exercise numbers (2a, 2b, etc.) */
 .badge-superset {
-    background-color: #6f42c1 !important;
+    background-color: #7a09b3 !important;
     color: white !important;
 }
 
 /* Purple buttons for superset actions */
 .btn-superset {
-    background-color: #6f42c1;
-    border-color: #6f42c1;
+    background-color: #7a09b3;
+    border-color: #7a09b3;
     color: white;
 }
 
 .btn-superset:hover,
 .btn-superset:focus {
-    background-color: #5a32a3;
-    border-color: #5a32a3;
+    background-color: #6e068e;
+    border-color: #6e068e;
     color: white;
 }
 
 .btn-outline-superset {
-    color: #6f42c1;
-    border-color: #6f42c1;
+    color: #7a09b3;
+    border-color: #7a09b3;
     background-color: transparent;
 }
 
 .btn-outline-superset:hover,
 .btn-outline-superset:focus {
-    background-color: #6f42c1;
-    border-color: #6f42c1;
+    background-color: #7a09b3;
+    border-color: #7a09b3;
     color: white;
 }
 
@@ -632,7 +916,7 @@ h6 i[class*=" fa-"] {
 /* No rest indicator */
 .superset-no-rest {
     font-size: 0.8rem;
-    color: #6f42c1;
+    color: #7a09b3;
     font-style: italic;
     text-align: center;
     margin: 0.25rem 0;
@@ -645,12 +929,12 @@ h6 i[class*=" fa-"] {
 }
 
 .exercise-selectable:hover {
-    background-color: rgba(111, 66, 193, 0.15) !important;
+    background-color: rgba(122, 9, 179, 0.15) !important;
 }
 
 .exercise-selectable.selected {
-    background-color: rgba(111, 66, 193, 0.25) !important;
-    border-color: #6f42c1 !important;
+    background-color: rgba(122, 9, 179, 0.25) !important;
+    border-color: #7a09b3 !important;
 }
 
 /* Checkbox for exercise selection */
@@ -661,7 +945,7 @@ h6 i[class*=" fa-"] {
     transform: translateY(-50%);
     width: 20px;
     height: 20px;
-    accent-color: #6f42c1;
+    accent-color: #7a09b3;
 }
 
 /* Superset toolbar */
@@ -670,27 +954,27 @@ h6 i[class*=" fa-"] {
     gap: 0.5rem;
     margin-bottom: 1rem;
     padding: 0.75rem;
-    background-color: rgba(111, 66, 193, 0.1);
+    background-color: rgba(122, 9, 179, 0.1);
     border-radius: 0.5rem;
     align-items: center;
 }
 
 .superset-toolbar-label {
-    color: #6f42c1;
+    color: #7a09b3;
     font-weight: 500;
     margin-right: auto;
 }
 
 /* Remove from superset button (small, inline) */
 .btn-remove-superset {
-    color: #6f42c1;
+    color: #7a09b3;
     padding: 0.25rem 0.5rem;
     font-size: 0.75rem;
 }
 
 .btn-remove-superset:hover {
-    color: #5a32a3;
-    background-color: rgba(111, 66, 193, 0.1);
+    color: #6e068e;
+    background-color: rgba(122, 9, 179, 0.1);
 }
 
 /* Superset indicator in logging view */
@@ -699,10 +983,10 @@ h6 i[class*=" fa-"] {
     align-items: center;
     justify-content: center;
     padding: 0.25rem 0.5rem;
-    background-color: rgba(111, 66, 193, 0.2);
+    background-color: rgba(122, 9, 179, 0.2);
     border-radius: 0.25rem;
     font-size: 0.75rem;
-    color: #6f42c1;
+    color: #7a09b3;
     margin: 0.25rem 0;
 }
 
