@@ -577,6 +577,50 @@ class Workout:
         return [dict(row) for row in rows]
 
     @staticmethod
+    def get_all_templates(user_id, visibility='all', order_by='name', limit=100, offset=0):
+        """Get all templates accessible to user (own + public) with filtering and sorting.
+
+        Args:
+            user_id: Current user's ID
+            visibility: 'all', 'mine', or 'public'
+            order_by: 'name', 'usage_count', or 'created_at'
+        """
+        db = get_db()
+
+        # Determine ORDER BY clause
+        order_clauses = {
+            'usage_count': 'w.usage_count DESC, w.name ASC',
+            'name': 'w.name ASC',
+            'created_at': 'w.created_at DESC'
+        }
+        order_clause = order_clauses.get(order_by, order_clauses['name'])
+
+        # Build WHERE clause based on visibility filter
+        if visibility == 'mine':
+            where_clause = 'w.is_template = 1 AND w.user_id = ?'
+            params = [user_id]
+        elif visibility == 'public':
+            where_clause = 'w.is_template = 1 AND w.is_public = 1'
+            params = []
+        else:  # 'all' - user's own templates + public templates from others
+            where_clause = 'w.is_template = 1 AND (w.user_id = ? OR w.is_public = 1)'
+            params = [user_id]
+
+        params.extend([limit, offset])
+
+        rows = db.execute(f'''
+            SELECT w.*, u.username as creator_username,
+                   CASE WHEN w.user_id = ? THEN 1 ELSE 0 END as is_owner
+            FROM workouts w
+            JOIN users u ON w.user_id = u.id
+            WHERE {where_clause}
+            ORDER BY {order_clause}
+            LIMIT ? OFFSET ?
+        ''', [user_id] + params).fetchall()
+
+        return [dict(row) for row in rows]
+
+    @staticmethod
     def get_template_with_creator(template_id):
         """Get a single template with creator information"""
         db = get_db()

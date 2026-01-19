@@ -54,22 +54,10 @@
                                 <i class="fa-solid fa-list-ul"></i> Exercises
                             </a>
                         </li>
-                        <li class="nav-item dropdown">
-                            <a class="nav-link dropdown-toggle" href="#" id="templatesDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                        <li class="nav-item">
+                            <a class="nav-link" href="{{ url_for('templates.list') }}">
                                 <i class="fa-solid fa-bookmark"></i> Templates
                             </a>
-                            <ul class="dropdown-menu" aria-labelledby="templatesDropdown">
-                                <li><a class="dropdown-item" href="{{ url_for('templates.list') }}">
-                                    <i class="fa-solid fa-bookmark"></i> My Templates
-                                </a></li>
-                                <li><a class="dropdown-item" href="{{ url_for('templates.browse_public') }}">
-                                    <i class="fa-solid fa-globe"></i> Browse Public Templates
-                                </a></li>
-                                <li><hr class="dropdown-divider"></li>
-                                <li><a class="dropdown-item" href="{{ url_for('templates.create') }}">
-                                    <i class="fa-solid fa-circle-plus"></i> Create New Template
-                                </a></li>
-                            </ul>
                         </li>
                         <li class="nav-item dropdown">
                             <a class="nav-link dropdown-toggle" href="#" id="navbarDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">

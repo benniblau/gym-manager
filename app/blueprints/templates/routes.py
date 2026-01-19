@@ -8,9 +8,20 @@ from app.blueprints.templates import templates_bp
 @templates_bp.route('/')
 @login_required
 def list():
-    """List all workout templates"""
-    templates = Workout.get_templates_by_user(current_user.id)
-    return render_template('templates/list.html', templates=templates)
+    """List all workout templates with filtering and sorting"""
+    visibility = request.args.get('visibility', 'all')
+    sort_by = request.args.get('sort', 'name')
+
+    templates = Workout.get_all_templates(
+        user_id=current_user.id,
+        visibility=visibility,
+        order_by=sort_by
+    )
+
+    return render_template('templates/list.html',
+                          templates=templates,
+                          current_visibility=visibility,
+                          current_sort=sort_by)
 
 
 @templates_bp.route('/create', methods=['GET', 'POST'])
@@ -197,13 +208,9 @@ def use_template(template_id):
 @templates_bp.route('/browse')
 @login_required
 def browse_public():
-    """Browse public templates"""
+    """Redirect to main templates list with public filter"""
     sort_by = request.args.get('sort', 'usage_count')
-    templates = Workout.get_public_templates(order_by=sort_by)
-
-    return render_template('templates/browse_public.html',
-                          templates=templates,
-                          current_sort=sort_by)
+    return redirect(url_for('templates.list', visibility='public', sort=sort_by))
 
 
 @templates_bp.route('/<int:template_id>/toggle-privacy', methods=['POST'])

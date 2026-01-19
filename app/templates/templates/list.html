@@ -11,6 +11,42 @@
         </a>
     </div>
 
+    <!-- Filter and Sort Options -->
+    <div class="row mb-4">
+        <div class="col-md-6 mb-2 mb-md-0">
+            <div class="btn-group" role="group">
+                <a href="{{ url_for('templates.list', visibility='all', sort=current_sort) }}"
+                   class="btn btn-sm btn-touch {% if current_visibility == 'all' %}btn-primary{% else %}btn-outline-primary{% endif %}">
+                    <i class="fa-solid fa-layer-group"></i> All
+                </a>
+                <a href="{{ url_for('templates.list', visibility='mine', sort=current_sort) }}"
+                   class="btn btn-sm btn-touch {% if current_visibility == 'mine' %}btn-primary{% else %}btn-outline-primary{% endif %}">
+                    <i class="fa-solid fa-user"></i> Mine
+                </a>
+                <a href="{{ url_for('templates.list', visibility='public', sort=current_sort) }}"
+                   class="btn btn-sm btn-touch {% if current_visibility == 'public' %}btn-primary{% else %}btn-outline-primary{% endif %}">
+                    <i class="fa-solid fa-globe"></i> Public
+                </a>
+            </div>
+        </div>
+        <div class="col-md-6 text-md-end">
+            <div class="btn-group" role="group">
+                <a href="{{ url_for('templates.list', visibility=current_visibility, sort='name') }}"
+                   class="btn btn-sm btn-touch {% if current_sort == 'name' %}btn-secondary{% else %}btn-outline-secondary{% endif %}">
+                    <i class="fa-solid fa-arrow-down-a-z"></i> Name
+                </a>
+                <a href="{{ url_for('templates.list', visibility=current_visibility, sort='usage_count') }}"
+                   class="btn btn-sm btn-touch {% if current_sort == 'usage_count' %}btn-secondary{% else %}btn-outline-secondary{% endif %}">
+                    <i class="fa-solid fa-fire"></i> Most Used
+                </a>
+                <a href="{{ url_for('templates.list', visibility=current_visibility, sort='created_at') }}"
+                   class="btn btn-sm btn-touch {% if current_sort == 'created_at' %}btn-secondary{% else %}btn-outline-secondary{% endif %}">
+                    <i class="fa-solid fa-calendar"></i> Newest
+                </a>
+            </div>
+        </div>
+    </div>
+
     {% if templates %}
         <div class="row">
             {% for template in templates %}
@@ -29,17 +65,17 @@
                                 <p class="card-text text-muted small">{{ template.notes[:100] }}</p>
                             {% endif %}
                             <p class="card-text">
-                                <small class="text-muted">
-                                    <i class="fa-solid fa-list-check"></i>
-                                    {{ template.get_exercises()|length }} exercises
-                                </small>
-                                {% if template.is_public %}
-                                    <br>
+                                {% if not template.is_owner %}
                                     <small class="text-muted">
-                                        <i class="fa-solid fa-users"></i>
-                                        Used {{ template.usage_count }} times
+                                        <i class="fa-solid fa-circle-user"></i>
+                                        by {{ template.creator_username }}
                                     </small>
+                                    <br>
                                 {% endif %}
+                                <small class="text-muted">
+                                    <i class="fa-solid fa-users"></i>
+                                    Used {{ template.usage_count }} times
+                                </small>
                             </p>
                         </div>
                         <div class="card-footer bg-transparent">
@@ -52,10 +88,12 @@
                                    class="btn btn-info btn-touch">
                                     <i class="fa-solid fa-eye"></i> View
                                 </a>
-                                <a href="{{ url_for('templates.edit', template_id=template.id) }}"
-                                   class="btn btn-secondary btn-touch">
-                                    <i class="fa-solid fa-pencil"></i> Edit
-                                </a>
+                                {% if template.is_owner %}
+                                    <a href="{{ url_for('templates.edit', template_id=template.id) }}"
+                                       class="btn btn-secondary btn-touch">
+                                        <i class="fa-solid fa-pencil"></i> Edit
+                                    </a>
+                                {% endif %}
                             </div>
                         </div>
                     </div>
@@ -64,8 +102,14 @@
         </div>
     {% else %}
         <div class="alert alert-info">
-            <i class="fa-solid fa-circle-info"></i> No templates yet.
-            <a href="{{ url_for('templates.create') }}" class="alert-link">Create your first template</a>
+            <i class="fa-solid fa-circle-info"></i>
+            {% if current_visibility == 'mine' %}
+                No templates yet. <a href="{{ url_for('templates.create') }}" class="alert-link">Create your first template</a>
+            {% elif current_visibility == 'public' %}
+                No public templates available yet.
+            {% else %}
+                No templates found.
+            {% endif %}
         </div>
     {% endif %}
 
