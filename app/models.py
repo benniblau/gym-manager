@@ -417,26 +417,26 @@ class Workout:
         if scheduled_time and hasattr(scheduled_time, 'isoformat'):
             scheduled_time = scheduled_time.isoformat()
 
-        # Convert end_date to string for SQLite (if provided)
-        end_date = kwargs.get('end_date')
-        if end_date and hasattr(end_date, 'isoformat'):
-            end_date = end_date.isoformat()
+        # Convert started_at to string for SQLite (if provided)
+        started_at = kwargs.get('started_at')
+        if started_at and hasattr(started_at, 'isoformat'):
+            started_at = started_at.isoformat()
 
-        # Convert end_time to string for SQLite (if provided)
-        end_time = kwargs.get('end_time')
-        if end_time and hasattr(end_time, 'isoformat'):
-            end_time = end_time.isoformat()
+        # Convert completed_at to string for SQLite (if provided)
+        completed_at = kwargs.get('completed_at')
+        if completed_at and hasattr(completed_at, 'isoformat'):
+            completed_at = completed_at.isoformat()
 
         cursor = db.execute('''
             INSERT INTO workouts (user_id, name, scheduled_date, scheduled_time, duration_minutes,
-                                 end_date, end_time, notes, status, is_template)
+                                 started_at, completed_at, notes, status, is_template)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ''', (
             user_id, name, scheduled_date,
             scheduled_time,
             kwargs.get('duration_minutes'),
-            end_date,
-            end_time,
+            started_at,
+            completed_at,
             kwargs.get('notes'),
             kwargs.get('status', 'planned'),
             kwargs.get('is_template', 0)
@@ -505,7 +505,7 @@ class Workout:
 
     @staticmethod
     def create_from_template(template_id, user_id, scheduled_date, scheduled_time=None,
-                            duration_minutes=None, end_date=None, end_time=None, notes=None):
+                            duration_minutes=None, started_at=None, completed_at=None, notes=None):
         """Create a new workout from a template"""
         # Get template
         template = Workout.get_by_id(template_id)
@@ -527,8 +527,8 @@ class Workout:
             scheduled_date=scheduled_date,
             scheduled_time=scheduled_time,
             duration_minutes=duration_minutes,
-            end_date=end_date,
-            end_time=end_time,
+            started_at=started_at,
+            completed_at=completed_at,
             notes=notes  # Notes should be pre-set by caller (with template notes as fallback)
         )
 

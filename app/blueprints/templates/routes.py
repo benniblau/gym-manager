@@ -158,19 +158,17 @@ def use_template(template_id):
         # Parse date
         parsed_date = datetime.strptime(scheduled_date, '%Y-%m-%d').date()
 
-        # Calculate end_date and end_time if both scheduled_time and duration are provided
-        end_date = None
-        end_time = None
+        # Calculate times if both scheduled_time and duration are provided
+        started_at = None
+        completed_at = None
         if scheduled_time and duration_minutes:
             try:
-                # Combine date and time
-                start_datetime = datetime.combine(parsed_date, datetime.strptime(scheduled_time, '%H:%M').time())
-                # Add duration
-                end_datetime = start_datetime + timedelta(minutes=int(duration_minutes))
-                end_date = end_datetime.date()
-                end_time = end_datetime.time().strftime('%H:%M')
+                # Combine date and time for start
+                started_at = datetime.combine(parsed_date, datetime.strptime(scheduled_time, '%H:%M').time())
+                # Add duration for end
+                completed_at = started_at + timedelta(minutes=int(duration_minutes))
             except (ValueError, TypeError):
-                # If calculation fails, just proceed without end time
+                # If calculation fails, just proceed without times
                 pass
 
         # Create workout from template (usage count auto-increments)
@@ -180,8 +178,8 @@ def use_template(template_id):
             scheduled_date=parsed_date,
             scheduled_time=scheduled_time,
             duration_minutes=int(duration_minutes) if duration_minutes else None,
-            end_date=end_date,
-            end_time=end_time,
+            started_at=started_at,
+            completed_at=completed_at,
             notes=notes
         )
 
