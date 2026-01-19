@@ -33,42 +33,37 @@
     {% if templates %}
         <div class="row">
             {% for template in templates %}
-                <div class="col-md-6 col-lg-4 mb-4">
-                    <div class="card h-100 border-success">
-                        <div class="card-header bg-success text-white">
-                            <h5 class="mb-0">
-                                <i class="fa-solid fa-bookmark"></i> {{ template.name }}
-                            </h5>
-                        </div>
+                <div class="col-md-6 col-lg-4 mb-3">
+                    <div class="card h-100">
                         <div class="card-body">
-                            <!-- Creator attribution -->
-                            <div class="mb-2">
-                                <span class="badge bg-primary">
-                                    <i class="fa-solid fa-circle-user"></i> by {{ template.creator_username }}
-                                </span>
-                                <span class="badge bg-secondary">
-                                    <i class="fa-solid fa-users"></i> {{ template.usage_count }} uses
-                                </span>
-                            </div>
-
-                            <!-- Notes preview -->
+                            <h5 class="card-title d-flex justify-content-between align-items-start">
+                                <span><i class="fa-solid fa-bookmark"></i> {{ template.name }}</span>
+                                <span class="badge bg-success"><i class="fa-solid fa-globe"></i> Public</span>
+                            </h5>
                             {% if template.notes %}
-                                <p class="card-text text-muted small">
-                                    {{ template.notes[:150] }}{% if template.notes|length > 150 %}...{% endif %}
-                                </p>
-                            {% else %}
-                                <p class="card-text text-muted small fst-italic">No description provided</p>
+                                <p class="card-text text-muted small">{{ template.notes[:100] }}</p>
                             {% endif %}
+                            <p class="card-text">
+                                <small class="text-muted">
+                                    <i class="fa-solid fa-circle-user"></i>
+                                    by {{ template.creator_username }}
+                                </small>
+                                <br>
+                                <small class="text-muted">
+                                    <i class="fa-solid fa-users"></i>
+                                    Used {{ template.usage_count }} times
+                                </small>
+                            </p>
                         </div>
                         <div class="card-footer bg-transparent">
-                            <div class="d-grid gap-2">
+                            <div class="btn-group w-100" role="group">
                                 <a href="{{ url_for('templates.use_template', template_id=template.id) }}"
                                    class="btn btn-success btn-touch">
-                                    <i class="fa-solid fa-play"></i> Use This Template
+                                    <i class="fa-solid fa-play"></i> Use
                                 </a>
                                 <a href="{{ url_for('templates.detail', template_id=template.id) }}"
-                                   class="btn btn-outline-info btn-touch">
-                                    <i class="fa-solid fa-eye"></i> View Details
+                                   class="btn btn-info btn-touch">
+                                    <i class="fa-solid fa-eye"></i> View
                                 </a>
                             </div>
                         </div>
