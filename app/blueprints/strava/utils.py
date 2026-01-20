@@ -125,8 +125,9 @@ def format_exercise_line(exercise, number_prefix):
     sets = exercise.get('actual_sets') or exercise.get('target_sets')
     reps = exercise.get('actual_reps') or exercise.get('target_reps')
     weight = exercise.get('actual_weight') or exercise.get('target_weight')
+    duration = exercise.get('actual_duration') or exercise.get('target_duration')
 
-    if sets or reps or weight:
+    if sets or reps or weight or duration:
         details = []
         if sets and reps:
             details.append(f"{sets}x{reps}")
@@ -137,6 +138,18 @@ def format_exercise_line(exercise, number_prefix):
 
         if weight:
             details.append(f"@{weight}kg")
+
+        if duration:
+            # Format duration in seconds to a readable format
+            if duration >= 60:
+                mins = duration // 60
+                secs = duration % 60
+                if secs > 0:
+                    details.append(f"{mins}m{secs}s")
+                else:
+                    details.append(f"{mins}m")
+            else:
+                details.append(f"{duration}s")
 
         if details:
             parts.append(' '.join(details))
@@ -212,7 +225,20 @@ def format_workout_description(workout, exercises):
 
 
 def calculate_elapsed_time(workout):
-    """Calculate workout duration in seconds from explicit start/end times"""
+    """Calculate workout duration in seconds.
+
+    Priority:
+    1. Use duration_minutes if explicitly set
+    2. Calculate from started_at and completed_at
+    """
+    # If duration_minutes is set, use it directly
+    if workout.duration_minutes:
+        return int(workout.duration_minutes * 60)
+
+    # Otherwise calculate from start/end times
+    if not workout.started_at or not workout.completed_at:
+        return 60  # Default to 1 minute if no time data
+
     # Parse started_at
     if isinstance(workout.started_at, str):
         started = datetime.fromisoformat(workout.started_at)

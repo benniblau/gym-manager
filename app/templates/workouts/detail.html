@@ -33,7 +33,11 @@
 
     <!-- Action buttons -->
     <div class="d-grid gap-2 mb-4">
-        {% if workout.status != 'completed' %}
+        {% if workout.status == 'completed' %}
+            <a href="{{ url_for('workouts.log', workout_id=workout.id) }}" class="btn btn-outline-primary btn-lg btn-touch">
+                <i class="fa-solid fa-pencil"></i> Edit Logged Values
+            </a>
+        {% else %}
             <a href="{{ url_for('workouts.log', workout_id=workout.id) }}" class="btn btn-primary btn-lg btn-touch">
                 <i class="fa-solid fa-play"></i> Log Workout
             </a>

@@ -372,3 +372,115 @@
 
 {% include 'includes/exercise_details_modal.html' %}
 {% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Stepper button functionality
+    document.querySelectorAll('.stepper-minus, .stepper-plus').forEach(function(button) {
+        button.addEventListener('click', function() {
+            const targetId = this.getAttribute('data-target');
+            const input = document.getElementById(targetId);
+            if (!input) return;
+
+            const step = parseFloat(this.getAttribute('data-step')) || 1;
+            const min = parseFloat(input.getAttribute('min')) || 0;
+            const max = parseFloat(input.getAttribute('max')) || 999;
+            let value = parseFloat(input.value) || 0;
+
+            if (this.classList.contains('stepper-plus')) {
+                value = Math.min(value + step, max);
+            } else {
+                value = Math.max(value - step, min);
+            }
+
+            input.value = value;
+
+            // Trigger auto-save
+            input.dispatchEvent(new Event('change', { bubbles: true }));
+        });
+    });
+
+    // Auto-save functionality
+    let saveTimeout;
+    document.querySelectorAll('.auto-save').forEach(function(input) {
+        input.addEventListener('change', function() {
+            const exerciseId = this.getAttribute('data-exercise-id');
+            const field = this.getAttribute('data-field');
+            const value = this.value;
+            const statusEl = document.getElementById('status-' + exerciseId);
+
+            // Show saving indicator
+            if (statusEl) {
+                statusEl.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Saving...';
+            }
+
+            // Debounce saves
+            clearTimeout(saveTimeout);
+            saveTimeout = setTimeout(function() {
+                // Collect all values for this exercise
+                const setsInput = document.querySelector(`[data-exercise-id="${exerciseId}"][data-field="actual_sets"]`);
+                const repsInput = document.querySelector(`[data-exercise-id="${exerciseId}"][data-field="actual_reps"]`);
+                const weightInput = document.querySelector(`[data-exercise-id="${exerciseId}"][data-field="actual_weight"]`);
+                const durationInput = document.querySelector(`[data-exercise-id="${exerciseId}"][data-field="actual_duration"]`);
+
+                const formData = new FormData();
+                if (setsInput && setsInput.value) formData.append('actual_sets', setsInput.value);
+                if (repsInput && repsInput.value) formData.append('actual_reps', repsInput.value);
+                if (weightInput && weightInput.value) formData.append('actual_weight', weightInput.value);
+                if (durationInput && durationInput.value) formData.append('actual_duration', durationInput.value);
+
+                fetch(`/workouts/{{ workout.id }}/exercises/${exerciseId}/update`, {
+                    method: 'POST',
+                    body: formData
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (statusEl) {
+                        if (data.success) {
+                            statusEl.innerHTML = '<i class="fa-solid fa-circle-check text-success"></i> Saved!';
+                            setTimeout(() => {
+                                statusEl.innerHTML = '<i class="fa-solid fa-cloud-arrow-up text-success"></i> Auto-save enabled';
+                            }, 2000);
+                        } else {
+                            statusEl.innerHTML = '<i class="fa-solid fa-triangle-exclamation text-danger"></i> Save failed';
+                        }
+                    }
+                    updateProgress();
+                })
+                .catch(error => {
+                    if (statusEl) {
+                        statusEl.innerHTML = '<i class="fa-solid fa-triangle-exclamation text-danger"></i> Save failed';
+                    }
+                });
+            }, 300);
+        });
+    });
+
+    // Update progress bar
+    function updateProgress() {
+        const inputs = document.querySelectorAll('.auto-save');
+        let filled = 0;
+        let total = 0;
+
+        // Count unique exercises (by checking sets field only)
+        const exercises = document.querySelectorAll('[data-field="actual_sets"]');
+        exercises.forEach(function(input) {
+            total++;
+            if (input.value && parseFloat(input.value) > 0) {
+                filled++;
+            }
+        });
+
+        const progress = total > 0 ? (filled / total) * 100 : 0;
+        const progressBar = document.getElementById('progress-bar');
+        if (progressBar) {
+            progressBar.style.width = progress + '%';
+        }
+    }
+
+    // Initial progress update
+    updateProgress();
+});
+</script>
+{% endblock %}
