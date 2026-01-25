@@ -93,11 +93,13 @@
                                                         <i class="fa-solid fa-minus"></i>
                                                     </button>
                                                     <input type="number"
+                                                           inputmode="numeric"
+                                                           pattern="[0-9]*"
                                                            class="form-control form-control-lg text-center auto-save"
                                                            id="sets_{{ ss_exercise.id }}"
                                                            name="sets_{{ ss_exercise.id }}"
                                                            value="{{ ss_exercise.actual_sets or ss_exercise.target_sets or '' }}"
-                                                           min="0" max="20"
+                                                           min="0" max="99"
                                                            data-exercise-id="{{ ss_exercise.id }}"
                                                            data-field="actual_sets"
                                                            placeholder="{{ ss_exercise.target_sets or '' }}">
@@ -115,11 +117,13 @@
                                                         <i class="fa-solid fa-minus"></i>
                                                     </button>
                                                     <input type="number"
+                                                           inputmode="numeric"
+                                                           pattern="[0-9]*"
                                                            class="form-control form-control-lg text-center auto-save"
                                                            id="reps_{{ ss_exercise.id }}"
                                                            name="reps_{{ ss_exercise.id }}"
                                                            value="{{ ss_exercise.actual_reps or ss_exercise.target_reps or '' }}"
-                                                           min="0" max="100"
+                                                           min="0" max="999"
                                                            data-exercise-id="{{ ss_exercise.id }}"
                                                            data-field="actual_reps"
                                                            placeholder="{{ ss_exercise.target_reps or '' }}">
@@ -137,11 +141,12 @@
                                                         <i class="fa-solid fa-minus"></i>
                                                     </button>
                                                     <input type="number"
+                                                           inputmode="decimal"
                                                            class="form-control form-control-lg text-center auto-save"
                                                            id="weight_{{ ss_exercise.id }}"
                                                            name="weight_{{ ss_exercise.id }}"
                                                            value="{{ ss_exercise.actual_weight or ss_exercise.target_weight or '' }}"
-                                                           min="0" step="5"
+                                                           min="0" step="0.5"
                                                            data-exercise-id="{{ ss_exercise.id }}"
                                                            data-field="actual_weight"
                                                            placeholder="{{ ss_exercise.target_weight or '' }}">
@@ -159,6 +164,8 @@
                                                         <i class="fa-solid fa-minus"></i>
                                                     </button>
                                                     <input type="number"
+                                                           inputmode="numeric"
+                                                           pattern="[0-9]*"
                                                            class="form-control form-control-lg text-center auto-save"
                                                            id="duration_{{ ss_exercise.id }}"
                                                            name="duration_{{ ss_exercise.id }}"
@@ -245,11 +252,13 @@
                                             <i class="fa-solid fa-minus"></i>
                                         </button>
                                         <input type="number"
+                                               inputmode="numeric"
+                                               pattern="[0-9]*"
                                                class="form-control form-control-lg text-center auto-save"
                                                id="sets_{{ exercise.id }}"
                                                name="sets_{{ exercise.id }}"
                                                value="{{ exercise.actual_sets or exercise.target_sets or '' }}"
-                                               min="0" max="20"
+                                               min="0" max="99"
                                                data-exercise-id="{{ exercise.id }}"
                                                data-field="actual_sets"
                                                placeholder="{{ exercise.target_sets or '' }}">
@@ -267,11 +276,13 @@
                                             <i class="fa-solid fa-minus"></i>
                                         </button>
                                         <input type="number"
+                                               inputmode="numeric"
+                                               pattern="[0-9]*"
                                                class="form-control form-control-lg text-center auto-save"
                                                id="reps_{{ exercise.id }}"
                                                name="reps_{{ exercise.id }}"
                                                value="{{ exercise.actual_reps or exercise.target_reps or '' }}"
-                                               min="0" max="100"
+                                               min="0" max="999"
                                                data-exercise-id="{{ exercise.id }}"
                                                data-field="actual_reps"
                                                placeholder="{{ exercise.target_reps or '' }}">
@@ -289,11 +300,12 @@
                                             <i class="fa-solid fa-minus"></i>
                                         </button>
                                         <input type="number"
+                                               inputmode="decimal"
                                                class="form-control form-control-lg text-center auto-save"
                                                id="weight_{{ exercise.id }}"
                                                name="weight_{{ exercise.id }}"
                                                value="{{ exercise.actual_weight or exercise.target_weight or '' }}"
-                                               min="0" step="5"
+                                               min="0" step="0.5"
                                                data-exercise-id="{{ exercise.id }}"
                                                data-field="actual_weight"
                                                placeholder="{{ exercise.target_weight or '' }}">
@@ -311,6 +323,8 @@
                                             <i class="fa-solid fa-minus"></i>
                                         </button>
                                         <input type="number"
+                                               inputmode="numeric"
+                                               pattern="[0-9]*"
                                                class="form-control form-control-lg text-center auto-save"
                                                id="duration_{{ exercise.id }}"
                                                name="duration_{{ exercise.id }}"

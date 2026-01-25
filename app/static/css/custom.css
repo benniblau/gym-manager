@@ -312,21 +312,35 @@
 /* Number stepper controls */
 .input-group-stepper {
     display: flex;
+    width: 100%;
 }
 
 .input-group-stepper .btn {
-    min-width: 48px;
-    flex: 0 0 auto;
+    min-width: 44px;
+    max-width: 44px;
+    flex: 0 0 44px;
+    padding: 0.5rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
 }
 
 .input-group-stepper .form-control {
     flex: 1 1 auto;
     text-align: center;
     font-weight: bold;
-    font-size: 1.5rem;
+    font-size: 1.25rem;
+    min-width: 50px;
+    padding: 0.5rem 0.25rem;
 }
 
-/* Hide number input spinners on mobile */
+/* Ensure number inputs work properly on mobile */
+.input-group-stepper input[type="number"] {
+    -webkit-text-size-adjust: 100%;
+    font-size: 16px; /* Prevents iOS zoom on focus */
+}
+
+/* Hide number input spinners */
 input[type=number]::-webkit-inner-spin-button,
 input[type=number]::-webkit-outer-spin-button {
     -webkit-appearance: none;
@@ -335,6 +349,20 @@ input[type=number]::-webkit-outer-spin-button {
 
 input[type=number] {
     -moz-appearance: textfield;
+}
+
+/* Mobile-specific adjustments for logging inputs */
+@media (max-width: 575.98px) {
+    .input-group-stepper .btn {
+        min-width: 38px;
+        max-width: 38px;
+        flex: 0 0 38px;
+    }
+
+    .input-group-stepper .form-control {
+        font-size: 1rem;
+        min-width: 40px;
+    }
 }
 
 /* Save status indicators */
