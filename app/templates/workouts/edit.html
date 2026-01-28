@@ -326,9 +326,11 @@
 </div>
 
 {% include 'includes/exercise_details_modal.html' %}
+{% include 'includes/exercise_modal.html' %}
 {% endblock %}
 
 {% block extra_js %}
+<script src="{{ url_for('static', filename='js/workout-edit.js') }}"></script>
 <script>
 const workoutId = {{ workout.id }};
 let selectionMode = false;
