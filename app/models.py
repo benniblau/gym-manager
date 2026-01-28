@@ -532,7 +532,7 @@ class Workout:
             notes=notes  # Notes should be pre-set by caller (with template notes as fallback)
         )
 
-        # Copy exercises from template (including superset groupings)
+        # Copy exercises from template (including superset groupings and reps)
         template_exercises = template.get_exercises()
         for ex in template_exercises:
             WorkoutExercise.add_to_workout(
@@ -544,7 +544,8 @@ class Workout:
                 target_weight=ex['target_weight'],
                 target_duration=ex['target_duration'],
                 notes=ex['notes'],
-                superset_group_id=ex.get('superset_group_id')
+                superset_group_id=ex.get('superset_group_id'),
+                superset_target_reps=ex.get('superset_target_reps')
             )
 
         # Increment usage count
@@ -730,8 +731,8 @@ class WorkoutExercise:
         db = get_db()
         cursor = db.execute('''
             INSERT INTO workout_exercises
-            (workout_id, exercise_id, order_position, target_sets, target_reps, target_weight, target_duration, notes, superset_group_id)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            (workout_id, exercise_id, order_position, target_sets, target_reps, target_weight, target_duration, notes, superset_group_id, superset_target_reps, superset_actual_reps)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ''', (
             workout_id, exercise_id, order_position,
             kwargs.get('target_sets'),
@@ -739,7 +740,9 @@ class WorkoutExercise:
             kwargs.get('target_weight'),
             kwargs.get('target_duration'),
             kwargs.get('notes'),
-            kwargs.get('superset_group_id')
+            kwargs.get('superset_group_id'),
+            kwargs.get('superset_target_reps'),
+            kwargs.get('superset_actual_reps')
         ))
         db.commit()
         return cursor.lastrowid
@@ -763,7 +766,7 @@ class WorkoutExercise:
         fields = []
         values = []
 
-        for key in ['actual_sets', 'actual_reps', 'actual_weight', 'actual_duration', 'target_sets', 'target_reps', 'target_weight', 'target_duration', 'notes', 'order_position']:
+        for key in ['actual_sets', 'actual_reps', 'actual_weight', 'actual_duration', 'target_sets', 'target_reps', 'target_weight', 'target_duration', 'notes', 'order_position', 'superset_target_reps', 'superset_actual_reps']:
             if key in kwargs:
                 fields.append(f'{key} = ?')
                 values.append(kwargs[key])
@@ -1028,10 +1031,50 @@ class WorkoutExercise:
         """Dissolve a superset (remove all exercises from it)"""
         db = get_db()
         db.execute('''
-            UPDATE workout_exercises SET superset_group_id = NULL
+            UPDATE workout_exercises SET superset_group_id = NULL,
+                   superset_target_reps = NULL, superset_actual_reps = NULL
             WHERE workout_id = ? AND superset_group_id = ?
         ''', (workout_id, superset_group_id))
         db.commit()
+
+    @staticmethod
+    def update_superset_reps(workout_id, superset_group_id, target_reps=None, actual_reps=None):
+        """Update the reps for all exercises in a superset"""
+        db = get_db()
+        fields = []
+        values = []
+
+        if target_reps is not None:
+            fields.append('superset_target_reps = ?')
+            values.append(target_reps if target_reps else None)
+
+        if actual_reps is not None:
+            fields.append('superset_actual_reps = ?')
+            values.append(actual_reps if actual_reps else None)
+
+        if fields:
+            values.extend([workout_id, superset_group_id])
+            query = f"UPDATE workout_exercises SET {', '.join(fields)} WHERE workout_id = ? AND superset_group_id = ?"
+            db.execute(query, values)
+            db.commit()
+
+    @staticmethod
+    def get_superset_reps(workout_id, superset_group_id):
+        """Get the reps for a superset (from the first exercise in the group)"""
+        db = get_db()
+        row = db.execute('''
+            SELECT superset_target_reps, superset_actual_reps
+            FROM workout_exercises
+            WHERE workout_id = ? AND superset_group_id = ?
+            ORDER BY order_position
+            LIMIT 1
+        ''', (workout_id, superset_group_id)).fetchone()
+        if row:
+            return {
+                'target_reps': row['superset_target_reps'],
+                'actual_reps': row['superset_actual_reps']
+            }
+        return None
 
 
 class Exercise:

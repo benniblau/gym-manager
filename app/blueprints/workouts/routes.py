@@ -530,6 +530,27 @@ def dissolve_superset(workout_id, group_id):
     return jsonify({'success': True})
 
 
+@workouts_bp.route('/<int:workout_id>/superset/<int:group_id>/update-reps', methods=['POST'])
+@login_required
+def update_superset_reps(workout_id, group_id):
+    """Update superset target or actual reps (AJAX endpoint)"""
+    workout = Workout.get_by_id(workout_id)
+
+    if not workout or workout.user_id != current_user.id:
+        return jsonify({'error': 'Unauthorized'}), 403
+
+    target_reps = request.form.get('target_reps', type=int)
+    actual_reps = request.form.get('actual_reps', type=int)
+
+    WorkoutExercise.update_superset_reps(
+        workout_id, group_id,
+        target_reps=target_reps,
+        actual_reps=actual_reps
+    )
+
+    return jsonify({'success': True})
+
+
 @workouts_bp.route('/<int:workout_id>/exercises/<int:workout_exercise_id>/remove-from-superset', methods=['POST'])
 @login_required
 def remove_from_superset(workout_id, workout_exercise_id):

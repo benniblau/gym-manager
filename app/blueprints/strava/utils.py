@@ -187,8 +187,14 @@ def format_workout_description(workout, exercises):
             superset_exercises = [e for e in exercises if e.get('superset_group_id') == superset_id]
             superset_count += 1
 
-            # Add superset header
-            lines.append(f'🔗 SUPERSET (no rest between):')
+            # Get superset rounds (actual or target from first exercise)
+            superset_rounds = superset_exercises[0].get('superset_actual_reps') or superset_exercises[0].get('superset_target_reps') if superset_exercises else None
+
+            # Add superset header with rounds if available
+            if superset_rounds:
+                lines.append(f'🔗 SUPERSET x{superset_rounds} (no rest between):')
+            else:
+                lines.append(f'🔗 SUPERSET (no rest between):')
 
             # Add each exercise in the superset with letter suffix
             letters = 'abcdefghijklmnopqrstuvwxyz'

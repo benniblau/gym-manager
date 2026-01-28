@@ -112,11 +112,23 @@
                                         {% set superset_exercises = exercises|selectattr('superset_group_id', 'equalto', exercise.superset_group_id)|list %}
 
                                         {# Render superset group container #}
+                                        {% set superset_reps = superset_exercises[0].superset_target_reps if superset_exercises else None %}
                                         <div class="superset-group" data-superset-id="{{ exercise.superset_group_id }}">
                                             <div class="superset-header">
                                                 <span class="superset-label">
                                                     <i class="fa-solid fa-layer-group"></i> Superset
                                                 </span>
+                                                <div class="superset-reps-input d-flex align-items-center mx-2">
+                                                    <label class="me-1 small text-muted">Rounds:</label>
+                                                    <input type="number"
+                                                           class="form-control form-control-sm superset-rounds-input"
+                                                           style="width: 60px;"
+                                                           data-superset-id="{{ exercise.superset_group_id }}"
+                                                           value="{{ superset_reps or '' }}"
+                                                           min="1"
+                                                           max="99"
+                                                           placeholder="—">
+                                                </div>
                                                 <div class="superset-controls">
                                                     <button class="btn btn-sm btn-outline-secondary reorder-superset"
                                                             data-superset-id="{{ exercise.superset_group_id }}"
@@ -535,6 +547,37 @@ document.querySelectorAll('.reorder-superset').forEach(btn => {
         } catch (error) {
             console.error('Error reordering superset:', error);
             alert('Failed to reorder superset. Please try again.');
+        }
+    });
+});
+
+// ===== SUPERSET REPS =====
+
+// Update superset rounds/reps
+document.querySelectorAll('.superset-rounds-input').forEach(input => {
+    input.addEventListener('change', async function() {
+        const supersetId = this.dataset.supersetId;
+        const targetReps = this.value;
+
+        try {
+            const formData = new FormData();
+            if (targetReps) {
+                formData.append('target_reps', targetReps);
+            }
+
+            const response = await fetch(`/workouts/${workoutId}/superset/${supersetId}/update-reps`, {
+                method: 'POST',
+                body: formData
+            });
+
+            const data = await response.json();
+
+            if (!data.success) {
+                alert(data.error || 'Failed to update superset rounds');
+            }
+        } catch (error) {
+            console.error('Error updating superset rounds:', error);
+            alert('Failed to update superset rounds. Please try again.');
         }
     });
 });
