@@ -199,7 +199,7 @@ def add_exercise(cursor, exercise_data, exercise_id, images_path, dry_run=False)
                 VALUES (?, ?, ?)
             ''', (exercise_id, step_num, instruction))
 
-    # Rename image file
+    # Rename image file (if old file exists) or verify new file exists
     old_path = os.path.join(images_path, exercise_data['old_filename'])
     new_path = os.path.join(images_path, exercise_data['new_filename'])
 
@@ -209,8 +209,10 @@ def add_exercise(cursor, exercise_data, exercise_id, images_path, dry_run=False)
         else:
             shutil.move(old_path, new_path)
             print(f"  ✓ Renamed image file")
+    elif os.path.exists(new_path):
+        print(f"  ✓ Image file already exists: {exercise_data['new_filename']}")
     else:
-        print(f"  ⚠ Warning: Image file not found: {old_path}")
+        print(f"  ⚠ Warning: Image file not found (checked both old and new names)")
 
     print(f"  ✓ Added successfully")
 
