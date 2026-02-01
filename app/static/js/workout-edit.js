@@ -312,6 +312,34 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     });
 
+    // Duplicate exercise button click handler
+    document.querySelectorAll('.duplicate-exercise').forEach(button => {
+        button.addEventListener('click', function() {
+            const baseUrl = getBaseUrl();
+            const exerciseId = this.getAttribute('data-exercise-id');
+
+            // Determine correct endpoint
+            const duplicateUrl = baseUrl.startsWith('/templates')
+                ? `/workouts${baseUrl.replace('/templates', '')}/exercises/${exerciseId}/duplicate`
+                : `${baseUrl}/exercises/${exerciseId}/duplicate`;
+
+            fetch(duplicateUrl, {
+                method: 'POST'
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    location.reload();
+                } else {
+                    alert('Error duplicating exercise: ' + (data.error || 'Unknown error'));
+                }
+            })
+            .catch(error => {
+                alert('Error duplicating exercise: ' + error);
+            });
+        });
+    });
+
     // Reorder exercise button click handler
     document.querySelectorAll('.reorder-exercise').forEach(button => {
         button.addEventListener('click', function() {

@@ -2,7 +2,7 @@ from flask import Blueprint, render_template, redirect, url_for, flash, request,
 from flask_login import login_required, current_user
 from datetime import datetime
 
-from app.models import Workout, WorkoutExercise, Exercise, StravaConnection, StravaUpload
+from app.models import Workout, WorkoutExercise, Exercise, StravaConnection, StravaUpload, get_db
 from app.blueprints.workouts.forms import WorkoutForm
 from app.utils.tcx_export import generate_tcx_xml
 
@@ -273,6 +273,53 @@ def update_exercise_targets(workout_id, workout_exercise_id):
     )
 
     return jsonify({'success': True})
+
+
+@workouts_bp.route('/<int:workout_id>/exercises/<int:workout_exercise_id>/duplicate', methods=['POST'])
+@login_required
+def duplicate_exercise(workout_id, workout_exercise_id):
+    """Duplicate an exercise in the workout (AJAX endpoint)"""
+    workout = Workout.get_by_id(workout_id)
+
+    if not workout or workout.user_id != current_user.id:
+        return jsonify({'error': 'Unauthorized'}), 403
+
+    # Get the original exercise
+    original = WorkoutExercise.get_by_id(workout_exercise_id)
+    if not original:
+        return jsonify({'error': 'Exercise not found'}), 404
+
+    # Get the order position right after the original
+    new_order = original['order_position'] + 1
+
+    # Shift all exercises after this position
+    db = get_db()
+    db.execute('''
+        UPDATE workout_exercises
+        SET order_position = order_position + 1
+        WHERE workout_id = ? AND order_position >= ?
+    ''', (workout_id, new_order))
+    db.commit()
+
+    # Create the duplicate
+    new_exercise_id = WorkoutExercise.add_to_workout(
+        workout_id=workout_id,
+        exercise_id=original['exercise_id'],
+        order_position=new_order,
+        target_sets=original.get('target_sets'),
+        target_reps=original.get('target_reps'),
+        target_weight=original.get('target_weight'),
+        target_duration=original.get('target_duration'),
+        notes=original.get('notes')
+    )
+
+    # Get the new exercise details
+    new_exercise = WorkoutExercise.get_by_id(new_exercise_id)
+
+    return jsonify({
+        'success': True,
+        'exercise': new_exercise
+    })
 
 
 @workouts_bp.route('/<int:workout_id>/exercises/<int:workout_exercise_id>/remove', methods=['POST'])
