@@ -32,25 +32,35 @@
         <div class="card-body">
             <form method="POST" action="{{ url_for('workouts.update_times', workout_id=workout.id) }}">
                 <div class="row">
-                    <div class="col-md-6 mb-3">
+                    <div class="col-md-4 mb-3">
                         <label for="start-datetime" class="form-label">Start Date & Time</label>
                         <input type="datetime-local"
                                class="form-control"
                                name="started_at"
                                id="start-datetime"
                                value="{% if workout.started_at %}{{ workout.started_at[:16] }}{% endif %}">
-                        <small class="form-text text-muted">When did the workout start?</small>
                     </div>
-                    <div class="col-md-6 mb-3">
+                    <div class="col-md-4 mb-3">
+                        <label for="duration-minutes" class="form-label">Duration (minutes)</label>
+                        <input type="number"
+                               class="form-control"
+                               name="duration_minutes"
+                               id="duration-minutes"
+                               value="{{ workout.duration_minutes or '' }}"
+                               min="1" max="600"
+                               inputmode="numeric"
+                               placeholder="e.g., 60">
+                    </div>
+                    <div class="col-md-4 mb-3">
                         <label for="end-datetime" class="form-label">End Date & Time</label>
                         <input type="datetime-local"
                                class="form-control"
                                name="completed_at"
                                id="end-datetime"
                                value="{% if workout.completed_at %}{{ workout.completed_at[:16] }}{% endif %}">
-                        <small class="form-text text-muted">When did the workout end?</small>
                     </div>
                 </div>
+                <small class="form-text text-muted d-block mb-3">Change start + duration to auto-calculate end time, or change end time to auto-calculate duration.</small>
                 <button type="submit" class="btn btn-primary">
                     <i class="fa-solid fa-clock"></i> Update Times
                 </button>
@@ -125,4 +135,36 @@
 
 {% block extra_js %}
 <script src="{{ url_for('static', filename='js/workout-edit.js') }}"></script>
+<script>
+// Auto-calculate end time from start + duration, or duration from start + end
+(function() {
+    const startInput = document.getElementById('start-datetime');
+    const durationInput = document.getElementById('duration-minutes');
+    const endInput = document.getElementById('end-datetime');
+    if (!startInput || !durationInput || !endInput) return;
+
+    function calcEndFromDuration() {
+        if (startInput.value && durationInput.value) {
+            const start = new Date(startInput.value);
+            start.setMinutes(start.getMinutes() + parseInt(durationInput.value));
+            // Format as YYYY-MM-DDTHH:MM for datetime-local
+            const pad = n => String(n).padStart(2, '0');
+            endInput.value = `${start.getFullYear()}-${pad(start.getMonth()+1)}-${pad(start.getDate())}T${pad(start.getHours())}:${pad(start.getMinutes())}`;
+        }
+    }
+
+    function calcDurationFromEnd() {
+        if (startInput.value && endInput.value) {
+            const start = new Date(startInput.value);
+            const end = new Date(endInput.value);
+            const mins = Math.round((end - start) / 60000);
+            if (mins > 0) durationInput.value = mins;
+        }
+    }
+
+    startInput.addEventListener('change', calcEndFromDuration);
+    durationInput.addEventListener('change', calcEndFromDuration);
+    endInput.addEventListener('change', calcDurationFromEnd);
+})();
+</script>
 {% endblock %}

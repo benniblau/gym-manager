@@ -452,7 +452,7 @@ class Workout:
         fields = []
         values = []
 
-        for key in ['name', 'scheduled_date', 'scheduled_time', 'notes', 'status', 'started_at', 'completed_at']:
+        for key in ['name', 'scheduled_date', 'scheduled_time', 'notes', 'status', 'started_at', 'completed_at', 'duration_minutes']:
             if key in kwargs:
                 value = kwargs[key]
                 # Convert date/time/datetime objects to strings for SQLite

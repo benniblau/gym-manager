@@ -20,7 +20,27 @@
             </p>
             {% if workout.scheduled_time %}
                 <p class="mb-1">
-                    <strong><i class="fa-solid fa-clock"></i> Time:</strong> {{ workout.scheduled_time }}
+                    <strong><i class="fa-solid fa-clock"></i> Scheduled Time:</strong> {{ workout.scheduled_time }}
+                </p>
+            {% endif %}
+            {% if workout.started_at %}
+                <p class="mb-1">
+                    <strong><i class="fa-solid fa-play"></i> Started:</strong> {{ workout.started_at[:16].replace('T', ' ') }}
+                </p>
+            {% endif %}
+            {% if workout.completed_at %}
+                <p class="mb-1">
+                    <strong><i class="fa-solid fa-flag-checkered"></i> Completed:</strong> {{ workout.completed_at[:16].replace('T', ' ') }}
+                </p>
+            {% endif %}
+            {% if workout.duration_minutes %}
+                <p class="mb-1">
+                    <strong><i class="fa-solid fa-stopwatch"></i> Duration:</strong>
+                    {% if workout.duration_minutes >= 60 %}
+                        {{ workout.duration_minutes // 60 }}h {{ workout.duration_minutes % 60 }}m
+                    {% else %}
+                        {{ workout.duration_minutes }}m
+                    {% endif %}
                 </p>
             {% endif %}
             {% if workout.notes %}

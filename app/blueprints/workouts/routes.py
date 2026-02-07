@@ -1,6 +1,6 @@
 from flask import Blueprint, render_template, redirect, url_for, flash, request, jsonify, abort, make_response
 from flask_login import login_required, current_user
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from app.models import Workout, WorkoutExercise, Exercise, StravaConnection, StravaUpload, get_db
 from app.blueprints.workouts.forms import WorkoutForm
@@ -39,11 +39,28 @@ def create():
             return redirect(url_for('templates.edit', template_id=template.id))
         else:
             # Create regular workout
+            duration_minutes = form.duration_minutes.data
+            scheduled_time = form.scheduled_time.data
+            scheduled_date = form.scheduled_date.data
+
+            # Calculate started_at and completed_at if both time and duration provided
+            started_at = None
+            completed_at = None
+            if scheduled_time and duration_minutes:
+                try:
+                    started_at = datetime.combine(scheduled_date, datetime.strptime(scheduled_time, '%H:%M').time())
+                    completed_at = started_at + timedelta(minutes=duration_minutes)
+                except (ValueError, TypeError):
+                    pass
+
             workout = Workout.create(
                 user_id=current_user.id,
                 name=form.name.data,
-                scheduled_date=form.scheduled_date.data,
-                scheduled_time=form.scheduled_time.data,
+                scheduled_date=scheduled_date,
+                scheduled_time=scheduled_time,
+                duration_minutes=duration_minutes,
+                started_at=started_at,
+                completed_at=completed_at,
                 notes=form.notes.data
             )
             flash(f'Workout "{workout.name}" created successfully!', 'success')
@@ -137,7 +154,7 @@ def update_name(workout_id):
 @workouts_bp.route('/<int:workout_id>/update-times', methods=['POST'])
 @login_required
 def update_times(workout_id):
-    """Update workout start and end times"""
+    """Update workout start/end times and duration"""
     workout = Workout.get_by_id(workout_id)
 
     if not workout or workout.user_id != current_user.id:
@@ -145,22 +162,25 @@ def update_times(workout_id):
 
     started_at = request.form.get('started_at', '').strip()
     completed_at = request.form.get('completed_at', '').strip()
+    duration_str = request.form.get('duration_minutes', '').strip()
 
     update_params = {}
+    start_dt = None
+    end_dt = None
+    duration_minutes = None
 
-    # Parse and validate datetime inputs
+    # Parse started_at
     if started_at:
         try:
-            # Convert from datetime-local format (YYYY-MM-DDTHH:MM) to ISO format
             start_dt = datetime.fromisoformat(started_at)
             update_params['started_at'] = start_dt
         except ValueError:
             flash('Invalid start date/time format', 'danger')
             return redirect(url_for('workouts.edit', workout_id=workout_id))
     else:
-        # Clear started_at if empty
         update_params['started_at'] = None
 
+    # Parse completed_at
     if completed_at:
         try:
             end_dt = datetime.fromisoformat(completed_at)
@@ -169,16 +189,36 @@ def update_times(workout_id):
             flash('Invalid end date/time format', 'danger')
             return redirect(url_for('workouts.edit', workout_id=workout_id))
     else:
-        # Clear completed_at if empty
         update_params['completed_at'] = None
 
+    # Parse duration
+    if duration_str:
+        try:
+            duration_minutes = int(duration_str)
+        except ValueError:
+            flash('Invalid duration', 'danger')
+            return redirect(url_for('workouts.edit', workout_id=workout_id))
+
+    # Auto-calculate missing fields
+    if start_dt and duration_minutes and not end_dt:
+        # Calculate end time from start + duration
+        end_dt = start_dt + timedelta(minutes=duration_minutes)
+        update_params['completed_at'] = end_dt
+    elif start_dt and end_dt and not duration_minutes:
+        # Calculate duration from start and end times
+        duration_minutes = int((end_dt - start_dt).total_seconds() / 60)
+    elif start_dt and end_dt and duration_minutes:
+        # All three provided - end time takes precedence, recalculate duration
+        duration_minutes = int((end_dt - start_dt).total_seconds() / 60)
+
+    update_params['duration_minutes'] = duration_minutes
+
     # Validate that start is before end
-    if started_at and completed_at:
+    if update_params.get('started_at') and update_params.get('completed_at'):
         if update_params['started_at'] >= update_params['completed_at']:
             flash('Start time must be before end time', 'danger')
             return redirect(url_for('workouts.edit', workout_id=workout_id))
 
-    # Update workout times
     workout.update(**update_params)
 
     flash('Workout times updated successfully', 'success')
@@ -444,15 +484,33 @@ def complete(workout_id):
     if not workout or workout.user_id != current_user.id:
         abort(404)
 
-    # Set completed_at to now, and started_at if not already set
+    now = datetime.now()
     update_params = {
         'status': 'completed',
-        'completed_at': datetime.now()
+        'completed_at': now
     }
 
-    # If started_at wasn't set, set it to completed_at (same time)
+    # Determine started_at
     if not workout.started_at:
-        update_params['started_at'] = datetime.now()
+        # Try to use scheduled_date + scheduled_time as start
+        if workout.scheduled_date and workout.scheduled_time:
+            try:
+                start_dt = datetime.combine(
+                    datetime.strptime(workout.scheduled_date, '%Y-%m-%d').date(),
+                    datetime.strptime(workout.scheduled_time, '%H:%M').time()
+                )
+                update_params['started_at'] = start_dt
+            except (ValueError, TypeError):
+                update_params['started_at'] = now
+        else:
+            update_params['started_at'] = now
+
+    # Calculate duration_minutes from the time difference
+    start = update_params.get('started_at') or (
+        datetime.fromisoformat(workout.started_at) if isinstance(workout.started_at, str) else workout.started_at
+    )
+    if start and start < now:
+        update_params['duration_minutes'] = int((now - start).total_seconds() / 60)
 
     workout.update(**update_params)
 

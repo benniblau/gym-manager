@@ -3,6 +3,8 @@ from datetime import datetime
 from xml.etree.ElementTree import Element, SubElement, tostring
 from xml.dom import minidom
 
+from app.blueprints.strava.utils import calculate_elapsed_time
+
 
 def generate_tcx_xml(workout, exercises):
     """
@@ -26,8 +28,8 @@ def generate_tcx_xml(workout, exercises):
     else:
         end_time = workout.completed_at
 
-    # Calculate duration
-    duration_seconds = (end_time - start_time).total_seconds()
+    # Calculate duration using shared helper (respects duration_minutes if set)
+    duration_seconds = calculate_elapsed_time(workout)
 
     # Create root element with namespaces (matching Garmin format)
     root = Element('TrainingCenterDatabase')

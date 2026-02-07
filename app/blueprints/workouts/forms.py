@@ -9,6 +9,7 @@ class WorkoutForm(FlaskForm):
     name = StringField('Workout Name', validators=[DataRequired()])
     scheduled_date = DateField('Date', validators=[DataRequired()], default=date.today)
     scheduled_time = TimeField('Time (optional)', validators=[Optional()])
+    duration_minutes = IntegerField('Duration (minutes)', validators=[Optional(), NumberRange(min=1, max=600)])
     notes = TextAreaField('Notes (optional)')
     submit = SubmitField('Create Workout')
 

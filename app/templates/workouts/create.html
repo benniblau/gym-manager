@@ -87,6 +87,19 @@
                         </div>
 
                         <div class="mb-3">
+                            {{ form.duration_minutes.label(class="form-label") }}
+                            {{ form.duration_minutes(class="form-control form-control-lg" + (" is-invalid" if form.duration_minutes.errors else ""), placeholder="e.g., 60", inputmode="numeric") }}
+                            <small class="form-text text-muted">End time will be calculated from start time + duration</small>
+                            {% if form.duration_minutes.errors %}
+                                <div class="invalid-feedback">
+                                    {% for error in form.duration_minutes.errors %}
+                                        {{ error }}
+                                    {% endfor %}
+                                </div>
+                            {% endif %}
+                        </div>
+
+                        <div class="mb-3">
                             {{ form.notes.label(class="form-label") }}
                             {{ form.notes(class="form-control" + (" is-invalid" if form.notes.errors else ""), rows="3", placeholder="Any notes about this workout...") }}
                             {% if form.notes.errors %}
@@ -122,19 +135,23 @@
                     function toggleDateFields(checkbox) {
                         const dateField = document.getElementById('scheduled_date');
                         const timeField = document.getElementById('scheduled_time');
+                        const durationField = document.getElementById('duration_minutes');
 
                         if (checkbox.checked) {
-                            // Template mode - dates optional
+                            // Template mode - dates/duration optional
                             dateField.required = false;
                             dateField.disabled = true;
                             dateField.value = '';
                             timeField.disabled = true;
                             timeField.value = '';
+                            durationField.disabled = true;
+                            durationField.value = '';
                         } else {
                             // Regular workout - date required
                             dateField.required = true;
                             dateField.disabled = false;
                             timeField.disabled = false;
+                            durationField.disabled = false;
                         }
                     }
                     </script>
