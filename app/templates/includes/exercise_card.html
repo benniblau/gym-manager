@@ -1,0 +1,266 @@
+{# Shared Jinja2 macros for exercise cards used on workout and template edit pages #}
+
+{# Render a standalone exercise card with dropdown action menu #}
+{% macro exercise_card_standalone(exercise, display_num) %}
+<div class="list-group-item exercise-selectable" id="exercise-{{ exercise.id }}" data-exercise-id="{{ exercise.id }}">
+    <div class="d-flex justify-content-between align-items-start">
+        <div class="flex-grow-1">
+            <h6 class="mb-1">
+                <span class="badge bg-secondary me-2">{{ display_num }}</span>
+                {{ exercise.exercise_name }}
+            </h6>
+            <small class="text-muted">
+                {% if exercise.target_sets %}{{ exercise.target_sets }} sets{% endif %}
+                {% if exercise.target_reps %} &times; {{ exercise.target_reps }} reps{% endif %}
+                {% if exercise.target_weight %} @ {{ exercise.target_weight }} kg{% endif %}
+                {% if exercise.target_duration %} &bull; {{ exercise.target_duration }}s{% endif %}
+            </small>
+        </div>
+        <div class="btn-group exercise-actions" role="group">
+            <button class="btn btn-sm btn-primary btn-touch edit-exercise"
+                    data-exercise-id="{{ exercise.id }}"
+                    data-exercise-name="{{ exercise.exercise_name }}"
+                    data-target-sets="{{ exercise.target_sets or '' }}"
+                    data-target-reps="{{ exercise.target_reps or '' }}"
+                    data-target-weight="{{ exercise.target_weight or '' }}"
+                    data-target-duration="{{ exercise.target_duration or '' }}"
+                    data-notes="{{ exercise.notes or '' }}"
+                    title="Edit">
+                <i class="fa-solid fa-pencil"></i>
+            </button>
+            <div class="btn-group" role="group">
+                <button type="button" class="btn btn-sm btn-outline-secondary btn-touch dropdown-toggle"
+                        data-bs-toggle="dropdown" aria-expanded="false" title="More actions">
+                    <i class="fa-solid fa-ellipsis-vertical"></i>
+                </button>
+                <ul class="dropdown-menu dropdown-menu-end">
+                    <li>
+                        <button class="dropdown-item reorder-exercise" data-exercise-id="{{ exercise.id }}" data-direction="up">
+                            <i class="fa-solid fa-arrow-up"></i> Move up
+                        </button>
+                    </li>
+                    <li>
+                        <button class="dropdown-item reorder-exercise" data-exercise-id="{{ exercise.id }}" data-direction="down">
+                            <i class="fa-solid fa-arrow-down"></i> Move down
+                        </button>
+                    </li>
+                    <li><hr class="dropdown-divider"></li>
+                    <li>
+                        <button class="dropdown-item duplicate-exercise" data-exercise-id="{{ exercise.id }}">
+                            <i class="fa-solid fa-copy"></i> Duplicate
+                        </button>
+                    </li>
+                    <li>
+                        <button class="dropdown-item text-danger remove-exercise" data-exercise-id="{{ exercise.id }}">
+                            <i class="fa-solid fa-trash"></i> Remove
+                        </button>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>
+{% endmacro %}
+
+{# Render a superset exercise card with dropdown action menu #}
+{% macro exercise_card_superset(exercise, display_num, letter) %}
+<div class="list-group-item exercise-selectable" id="exercise-{{ exercise.id }}" data-exercise-id="{{ exercise.id }}" data-superset-id="{{ exercise.superset_group_id }}">
+    <div class="d-flex justify-content-between align-items-start">
+        <div class="flex-grow-1">
+            <h6 class="mb-1">
+                <span class="badge badge-superset me-2">{{ display_num }}{{ letter }}</span>
+                {{ exercise.exercise_name }}
+            </h6>
+            <small class="text-muted">
+                {% if exercise.target_sets %}{{ exercise.target_sets }} sets{% endif %}
+                {% if exercise.target_reps %} &times; {{ exercise.target_reps }} reps{% endif %}
+                {% if exercise.target_weight %} @ {{ exercise.target_weight }} kg{% endif %}
+                {% if exercise.target_duration %} &bull; {{ exercise.target_duration }}s{% endif %}
+            </small>
+        </div>
+        <div class="btn-group exercise-actions" role="group">
+            <button class="btn btn-sm btn-primary btn-touch edit-exercise"
+                    data-exercise-id="{{ exercise.id }}"
+                    data-exercise-name="{{ exercise.exercise_name }}"
+                    data-target-sets="{{ exercise.target_sets or '' }}"
+                    data-target-reps="{{ exercise.target_reps or '' }}"
+                    data-target-weight="{{ exercise.target_weight or '' }}"
+                    data-target-duration="{{ exercise.target_duration or '' }}"
+                    data-notes="{{ exercise.notes or '' }}"
+                    title="Edit">
+                <i class="fa-solid fa-pencil"></i>
+            </button>
+            <div class="btn-group" role="group">
+                <button type="button" class="btn btn-sm btn-outline-secondary btn-touch dropdown-toggle"
+                        data-bs-toggle="dropdown" aria-expanded="false" title="More actions">
+                    <i class="fa-solid fa-ellipsis-vertical"></i>
+                </button>
+                <ul class="dropdown-menu dropdown-menu-end">
+                    <li>
+                        <button class="dropdown-item remove-from-superset" data-exercise-id="{{ exercise.id }}">
+                            <i class="fa-solid fa-right-from-bracket"></i> Remove from superset
+                        </button>
+                    </li>
+                    <li><hr class="dropdown-divider"></li>
+                    <li>
+                        <button class="dropdown-item duplicate-exercise" data-exercise-id="{{ exercise.id }}">
+                            <i class="fa-solid fa-copy"></i> Duplicate
+                        </button>
+                    </li>
+                    <li>
+                        <button class="dropdown-item text-danger remove-exercise" data-exercise-id="{{ exercise.id }}">
+                            <i class="fa-solid fa-trash"></i> Remove
+                        </button>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>
+{% endmacro %}
+
+{# Render a superset group with header and child exercises #}
+{% macro superset_group(superset_exercises, superset_group_id, display_num, show_rounds=false) %}
+{% set superset_reps = superset_exercises[0].superset_target_reps if superset_exercises else None %}
+<div class="superset-group" data-superset-id="{{ superset_group_id }}">
+    <div class="superset-header">
+        <span class="superset-label">
+            <i class="fa-solid fa-layer-group"></i> Superset
+        </span>
+        {% if show_rounds %}
+        <div class="superset-reps-input d-flex align-items-center mx-2">
+            <label class="me-1 small text-muted">Rounds:</label>
+            <input type="number"
+                   class="form-control form-control-sm superset-rounds-input"
+                   style="width: 60px;"
+                   data-superset-id="{{ superset_group_id }}"
+                   value="{{ superset_reps or '' }}"
+                   min="1"
+                   max="99"
+                   placeholder="&mdash;">
+        </div>
+        {% endif %}
+        <div class="superset-controls">
+            <button class="btn btn-sm btn-outline-secondary btn-touch reorder-superset"
+                    data-superset-id="{{ superset_group_id }}"
+                    data-direction="up"
+                    title="Move superset up">
+                <i class="fa-solid fa-arrow-up"></i>
+            </button>
+            <button class="btn btn-sm btn-outline-secondary btn-touch reorder-superset"
+                    data-superset-id="{{ superset_group_id }}"
+                    data-direction="down"
+                    title="Move superset down">
+                <i class="fa-solid fa-arrow-down"></i>
+            </button>
+            <button class="btn btn-sm btn-outline-danger btn-touch dissolve-superset"
+                    data-superset-id="{{ superset_group_id }}"
+                    title="Dissolve superset">
+                <i class="fa-solid fa-unlink"></i>
+            </button>
+        </div>
+    </div>
+
+    {% for ss_exercise in superset_exercises %}
+        {% set letter = 'abcdefghijklmnopqrstuvwxyz'[loop.index0] %}
+        {{ exercise_card_superset(ss_exercise, display_num, letter) }}
+        {% if not loop.last %}
+        <div class="superset-no-rest">
+            <i class="fa-solid fa-bolt"></i> No rest
+        </div>
+        {% endif %}
+    {% endfor %}
+</div>
+{% endmacro %}
+
+{# Render the current exercises list (both standalone and supersets) #}
+{% macro current_exercises_list(exercises, show_rounds=false) %}
+{% if exercises %}
+    <div id="current-exercises" class="list-group">
+        {% set ns = namespace(display_num=1, processed_groups=[], last_was_superset=false) %}
+        {% for exercise in exercises %}
+            {% if exercise.superset_group_id %}
+                {% if exercise.superset_group_id not in ns.processed_groups %}
+                    {% set ns.processed_groups = ns.processed_groups + [exercise.superset_group_id] %}
+                    {% set ss_exercises = exercises|selectattr('superset_group_id', 'equalto', exercise.superset_group_id)|list %}
+                    {{ superset_group(ss_exercises, exercise.superset_group_id, ns.display_num, show_rounds) }}
+                    {% set ns.display_num = ns.display_num + 1 %}
+                    {% set ns.last_was_superset = true %}
+                {% endif %}
+            {% else %}
+                {{ exercise_card_standalone(exercise, ns.display_num) }}
+                {% set ns.display_num = ns.display_num + 1 %}
+                {% set ns.last_was_superset = false %}
+            {% endif %}
+        {% endfor %}
+    </div>
+{% else %}
+    <p class="text-muted" id="no-exercises-msg">No exercises added yet. Search and add exercises below.</p>
+{% endif %}
+{% endmacro %}
+
+{# Render the Add Exercises search/filter panel #}
+{% macro add_exercises_panel(all_exercises, categories, muscles) %}
+<div class="card">
+    <div class="card-header">
+        <h5 class="mb-0"><i class="fa-solid fa-circle-plus"></i> Add Exercises</h5>
+    </div>
+    <div class="card-body">
+        <!-- Search and filters -->
+        <div class="mb-3">
+            <input type="text" id="exercise-search" class="form-control" placeholder="Search exercises...">
+        </div>
+
+        <div class="row mb-3">
+            <div class="col-6 mb-2">
+                <select id="category-filter" class="form-select">
+                    <option value="">All Categories</option>
+                    {% for category in categories %}
+                        <option value="{{ category }}">{{ category }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-6 mb-2">
+                <select id="muscle-filter" class="form-select">
+                    <option value="">All Muscles</option>
+                    {% for muscle in muscles %}
+                        <option value="{{ muscle }}">{{ muscle }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+        </div>
+
+        <!-- Exercise list -->
+        <div id="exercise-list" class="exercise-list-scroll">
+            {% for exercise in all_exercises %}
+                <div class="card mb-2 exercise-item"
+                     data-category="{{ exercise.category }}"
+                     data-muscle="{{ exercise.primary_muscles }}">
+                    <div class="card-body p-2">
+                        <div class="d-flex justify-content-between align-items-start">
+                            <div class="flex-grow-1">
+                                <h6 class="mb-1">{{ exercise.name }}</h6>
+                                <small class="text-muted d-block">{{ exercise.category_name or exercise.category }}</small>
+                            </div>
+                            <div class="btn-group">
+                                <button class="btn btn-sm btn-info btn-touch view-exercise-details"
+                                        data-exercise-id="{{ exercise.id }}"
+                                        data-exercise-name="{{ exercise.name }}"
+                                        title="View details">
+                                    <i class="fa-solid fa-circle-info"></i>
+                                </button>
+                                <button class="btn btn-sm btn-primary btn-touch add-exercise"
+                                        data-exercise-id="{{ exercise.id }}"
+                                        data-exercise-name="{{ exercise.name }}"
+                                        title="Add to workout">
+                                    <i class="fa-solid fa-plus"></i>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+{% endmacro %}

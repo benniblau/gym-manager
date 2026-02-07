@@ -1,221 +1,12 @@
-// Workout Edit Page JavaScript
-// Handles exercise search, filtering, adding, removing, and reordering
+// Workout/Template Edit Page JavaScript
+// Consolidated handler for exercise management, supersets, search and filtering.
+// Works for both /workouts/<id>/edit and /templates/<id>/edit pages.
 
 document.addEventListener('DOMContentLoaded', function() {
-    const exerciseSearch = document.getElementById('exercise-search');
-    const categoryFilter = document.getElementById('category-filter');
-    const muscleFilter = document.getElementById('muscle-filter');
-    const exerciseItems = document.querySelectorAll('.exercise-item');
 
-    // Search and filter functionality
-    function filterExercises() {
-        const searchTerm = exerciseSearch.value.toLowerCase();
-        const selectedCategory = categoryFilter.value;
-        const selectedMuscle = muscleFilter.value;
+    // ===== URL HELPERS =====
 
-        exerciseItems.forEach(item => {
-            const exerciseName = item.querySelector('h6').textContent.toLowerCase();
-            const exerciseCategory = item.getAttribute('data-category') || '';
-            const exerciseMuscles = item.getAttribute('data-muscle') || '';
-
-            const matchesSearch = exerciseName.includes(searchTerm);
-            const matchesCategory = !selectedCategory || exerciseCategory === selectedCategory;
-            // For muscles, check if the selected muscle is in the comma-separated list
-            const matchesMuscle = !selectedMuscle || exerciseMuscles.split(', ').includes(selectedMuscle);
-
-            if (matchesSearch && matchesCategory && matchesMuscle) {
-                item.style.display = '';
-            } else {
-                item.style.display = 'none';
-            }
-        });
-    }
-
-    // Add event listeners for search and filters
-    if (exerciseSearch) {
-        exerciseSearch.addEventListener('input', filterExercises);
-    }
-    if (categoryFilter) {
-        categoryFilter.addEventListener('change', filterExercises);
-    }
-    if (muscleFilter) {
-        muscleFilter.addEventListener('change', filterExercises);
-    }
-
-    // View exercise details button click handler
-    document.querySelectorAll('.view-exercise-details').forEach(button => {
-        button.addEventListener('click', async function() {
-            const exerciseId = this.getAttribute('data-exercise-id');
-            const exerciseName = this.getAttribute('data-exercise-name');
-
-            // Show modal
-            const modal = new bootstrap.Modal(document.getElementById('exerciseDetailsModal'));
-            modal.show();
-
-            // Reset modal state
-            document.getElementById('details-exercise-name').textContent = exerciseName;
-            document.getElementById('details-loading').style.display = 'block';
-            document.getElementById('details-content').style.display = 'none';
-            document.getElementById('details-error').style.display = 'none';
-
-            try {
-                // Fetch exercise details
-                const response = await fetch(`/exercises/${exerciseId}/details`);
-                const data = await response.json();
-
-                if (data.error) {
-                    throw new Error(data.error);
-                }
-
-                // Hide loading, show content
-                document.getElementById('details-loading').style.display = 'none';
-                document.getElementById('details-content').style.display = 'block';
-
-                // Populate modal with data
-                document.getElementById('details-category').textContent = data.category_name || '';
-                document.getElementById('details-muscles').textContent = data.primary_muscles || '';
-                document.getElementById('details-description').textContent = data.description || 'No description available';
-
-                // Images
-                const imagesContainer = document.getElementById('details-images-container');
-                const image1Container = document.getElementById('details-image1-container');
-                const image2Container = document.getElementById('details-image2-container');
-
-                let hasImages = false;
-                if (data.image1_url) {
-                    document.getElementById('details-image1').src = data.image1_url;
-                    image1Container.style.display = 'block';
-                    hasImages = true;
-                } else {
-                    image1Container.style.display = 'none';
-                }
-
-                if (data.image2_url) {
-                    document.getElementById('details-image2').src = data.image2_url;
-                    image2Container.style.display = 'block';
-                    hasImages = true;
-                } else {
-                    image2Container.style.display = 'none';
-                }
-
-                imagesContainer.style.display = hasImages ? 'block' : 'none';
-
-                // Instructions
-                const instructionsContainer = document.getElementById('details-instructions-container');
-                const instructionsList = document.getElementById('details-instructions');
-                if (data.instructions && data.instructions.length > 0) {
-                    instructionsList.innerHTML = '';
-                    data.instructions.forEach(instruction => {
-                        const li = document.createElement('li');
-                        li.textContent = instruction;
-                        instructionsList.appendChild(li);
-                    });
-                    instructionsContainer.style.display = 'block';
-                } else {
-                    instructionsContainer.style.display = 'none';
-                }
-
-                // Equipment
-                const equipmentContainer = document.getElementById('details-equipment-container');
-                if (data.equipment && data.equipment.length > 0) {
-                    document.getElementById('details-equipment').textContent = data.equipment.join(', ');
-                    equipmentContainer.style.display = 'block';
-                } else {
-                    equipmentContainer.style.display = 'none';
-                }
-
-                // External links
-                const videoLink = document.getElementById('details-video-link');
-                if (data.video) {
-                    videoLink.href = data.video;
-                    videoLink.style.display = 'inline-block';
-                } else {
-                    videoLink.style.display = 'none';
-                }
-
-                // Exercem link (using exercem_url helper)
-                const exercemLink = document.getElementById('details-exercem-link');
-                exercemLink.href = `https://exercem.us/exercises/${encodeURIComponent(data.name.toLowerCase().replace(/ /g, '-'))}`;
-
-                // Garmin link
-                const garminLink = document.getElementById('details-garmin-link');
-                if (data.garmin_url) {
-                    garminLink.href = data.garmin_url;
-                    garminLink.style.display = 'inline-block';
-                } else {
-                    garminLink.style.display = 'none';
-                }
-
-            } catch (error) {
-                console.error('Error fetching exercise details:', error);
-                document.getElementById('details-loading').style.display = 'none';
-                document.getElementById('details-error').style.display = 'block';
-            }
-        });
-    });
-
-    // Edit exercise button click handler
-    document.querySelectorAll('.edit-exercise').forEach(button => {
-        button.addEventListener('click', function() {
-            const exerciseId = this.getAttribute('data-exercise-id');
-            const exerciseName = this.getAttribute('data-exercise-name');
-            const targetSets = this.getAttribute('data-target-sets');
-            const targetReps = this.getAttribute('data-target-reps');
-            const targetWeight = this.getAttribute('data-target-weight');
-            const targetDuration = this.getAttribute('data-target-duration');
-            const notes = this.getAttribute('data-notes');
-
-            // Show modal with current values
-            document.getElementById('modal-exercise-name').textContent = exerciseName;
-            document.getElementById('modal-exercise-id').value = exerciseId;
-
-            // Populate form with existing values (use actual values, don't default)
-            document.getElementById('target-sets').value = targetSets || '';
-            document.getElementById('target-reps').value = targetReps || '';
-            document.getElementById('target-weight').value = targetWeight || '';
-            document.getElementById('target-duration').value = targetDuration || '';
-            document.getElementById('exercise-notes').value = notes || '';
-
-            // Change modal title and button text for editing
-            document.querySelector('#exerciseModal .modal-title').textContent = 'Edit Exercise';
-            document.getElementById('confirm-add-exercise').textContent = 'Update Exercise';
-            document.getElementById('confirm-add-exercise').setAttribute('data-mode', 'edit');
-
-            // Show modal
-            const modal = new bootstrap.Modal(document.getElementById('exerciseModal'));
-            modal.show();
-        });
-    });
-
-    // Add exercise button click handler
-    document.querySelectorAll('.add-exercise').forEach(button => {
-        button.addEventListener('click', function() {
-            const exerciseId = this.getAttribute('data-exercise-id');
-            const exerciseName = this.getAttribute('data-exercise-name');
-
-            // Show modal with exercise details
-            document.getElementById('modal-exercise-name').textContent = exerciseName;
-            document.getElementById('modal-exercise-id').value = exerciseId;
-
-            // Reset form values
-            document.getElementById('target-sets').value = 3;
-            document.getElementById('target-reps').value = 10;
-            document.getElementById('target-weight').value = '';
-            document.getElementById('target-duration').value = '';
-            document.getElementById('exercise-notes').value = '';
-
-            // Change modal title and button text for adding
-            document.querySelector('#exerciseModal .modal-title').textContent = 'Add Exercise';
-            document.getElementById('confirm-add-exercise').textContent = 'Add Exercise';
-            document.getElementById('confirm-add-exercise').setAttribute('data-mode', 'add');
-
-            // Show modal
-            const modal = new bootstrap.Modal(document.getElementById('exerciseModal'));
-            modal.show();
-        });
-    });
-
-    // Helper function to get base URL (works for both /workouts and /templates)
+    // Detect page context from URL
     function getBaseUrl() {
         const pathParts = window.location.pathname.split('/');
         const baseType = pathParts[1]; // 'workouts' or 'templates'
@@ -223,11 +14,174 @@ document.addEventListener('DOMContentLoaded', function() {
         return `/${baseType}/${id}`;
     }
 
-    // Confirm add/edit exercise button
+    const baseUrl = getBaseUrl();
+    const entityId = baseUrl.split('/')[2];
+    const isTemplate = baseUrl.startsWith('/templates');
+
+    // Exercise CRUD endpoints always go through /workouts/ routes
+    function exerciseUrl(exerciseId, action) {
+        const prefix = isTemplate ? '/workouts' : baseUrl.split('/').slice(0, 2).join('/');
+        return `${prefix}/${entityId}/exercises/${exerciseId}/${action}`;
+    }
+
+    // Superset endpoints use the current baseUrl (both blueprints have routes)
+    function supersetUrl(action) {
+        return `${baseUrl}/superset/${action}`;
+    }
+
+    // ===== GENERIC POST HELPER =====
+
+    async function postAction(url, body, onSuccess) {
+        try {
+            const response = await fetch(url, {
+                method: 'POST',
+                body: body || undefined
+            });
+            const data = await response.json();
+            if (data.success) {
+                if (onSuccess) onSuccess(data);
+                else location.reload();
+            } else {
+                alert(data.error || 'Action failed');
+            }
+        } catch (error) {
+            console.error('Action failed:', error);
+            alert('Action failed. Please try again.');
+        }
+    }
+
+    // ===== EVENT DELEGATION ON CURRENT EXERCISES =====
+
+    const currentExercises = document.getElementById('current-exercises');
+    if (currentExercises) {
+        currentExercises.addEventListener('click', function(e) {
+            const button = e.target.closest('button');
+            if (!button) return;
+
+            const exerciseId = button.getAttribute('data-exercise-id');
+
+            // Edit exercise
+            if (button.classList.contains('edit-exercise')) {
+                e.stopPropagation();
+                openEditModal(button);
+                return;
+            }
+
+            // Remove exercise
+            if (button.classList.contains('remove-exercise')) {
+                e.stopPropagation();
+                if (!confirm('Remove this exercise from the workout?')) return;
+                postAction(exerciseUrl(exerciseId, 'remove'));
+                return;
+            }
+
+            // Duplicate exercise
+            if (button.classList.contains('duplicate-exercise')) {
+                e.stopPropagation();
+                postAction(exerciseUrl(exerciseId, 'duplicate'));
+                return;
+            }
+
+            // Reorder exercise
+            if (button.classList.contains('reorder-exercise')) {
+                e.stopPropagation();
+                const direction = button.getAttribute('data-direction');
+                const formData = new URLSearchParams({ direction: direction });
+                postAction(exerciseUrl(exerciseId, 'reorder'), formData);
+                return;
+            }
+
+            // Remove from superset
+            if (button.classList.contains('remove-from-superset')) {
+                e.stopPropagation();
+                postAction(exerciseUrl(exerciseId, 'remove-from-superset'));
+                return;
+            }
+
+            // Dissolve superset
+            if (button.classList.contains('dissolve-superset')) {
+                if (!confirm('Dissolve this superset? Exercises will become standalone.')) return;
+                const supersetId = button.getAttribute('data-superset-id');
+                postAction(`${baseUrl}/superset/${supersetId}/dissolve`);
+                return;
+            }
+
+            // Reorder superset (move entire group)
+            if (button.classList.contains('reorder-superset')) {
+                const supersetId = button.getAttribute('data-superset-id');
+                const direction = button.getAttribute('data-direction');
+                const supersetGroup = document.querySelector(`.superset-group[data-superset-id="${supersetId}"]`);
+                const firstExercise = supersetGroup.querySelector('.list-group-item');
+                if (!firstExercise) return;
+                const firstExerciseId = firstExercise.dataset.exerciseId;
+                const formData = new URLSearchParams({ direction: direction });
+                postAction(exerciseUrl(firstExerciseId, 'reorder'), formData);
+                return;
+            }
+        });
+    }
+
+    // ===== EDIT EXERCISE MODAL =====
+
+    function openEditModal(button) {
+        const exerciseId = button.getAttribute('data-exercise-id');
+        const exerciseName = button.getAttribute('data-exercise-name');
+        const targetSets = button.getAttribute('data-target-sets');
+        const targetReps = button.getAttribute('data-target-reps');
+        const targetWeight = button.getAttribute('data-target-weight');
+        const targetDuration = button.getAttribute('data-target-duration');
+        const notes = button.getAttribute('data-notes');
+
+        document.getElementById('modal-exercise-name').textContent = exerciseName;
+        document.getElementById('modal-exercise-id').value = exerciseId;
+        document.getElementById('target-sets').value = targetSets || '';
+        document.getElementById('target-reps').value = targetReps || '';
+        document.getElementById('target-weight').value = targetWeight || '';
+        document.getElementById('target-duration').value = targetDuration || '';
+        document.getElementById('exercise-notes').value = notes || '';
+
+        document.querySelector('#exerciseModal .modal-title').textContent = 'Edit Exercise';
+        document.getElementById('confirm-add-exercise').textContent = 'Update Exercise';
+        document.getElementById('confirm-add-exercise').setAttribute('data-mode', 'edit');
+
+        const modal = new bootstrap.Modal(document.getElementById('exerciseModal'));
+        modal.show();
+    }
+
+    // ===== ADD EXERCISE MODAL (from exercise list) =====
+    // Uses delegation on #exercise-list for dynamically loaded items
+
+    const exerciseList = document.getElementById('exercise-list');
+    if (exerciseList) {
+        exerciseList.addEventListener('click', function(e) {
+            const button = e.target.closest('.add-exercise');
+            if (!button) return;
+
+            const exerciseId = button.getAttribute('data-exercise-id');
+            const exerciseName = button.getAttribute('data-exercise-name');
+
+            document.getElementById('modal-exercise-name').textContent = exerciseName;
+            document.getElementById('modal-exercise-id').value = exerciseId;
+            document.getElementById('target-sets').value = 3;
+            document.getElementById('target-reps').value = 10;
+            document.getElementById('target-weight').value = '';
+            document.getElementById('target-duration').value = '';
+            document.getElementById('exercise-notes').value = '';
+
+            document.querySelector('#exerciseModal .modal-title').textContent = 'Add Exercise';
+            document.getElementById('confirm-add-exercise').textContent = 'Add Exercise';
+            document.getElementById('confirm-add-exercise').setAttribute('data-mode', 'add');
+
+            const modal = new bootstrap.Modal(document.getElementById('exerciseModal'));
+            modal.show();
+        });
+    }
+
+    // ===== CONFIRM ADD/EDIT EXERCISE =====
+
     const confirmAddButton = document.getElementById('confirm-add-exercise');
     if (confirmAddButton) {
         confirmAddButton.addEventListener('click', function() {
-            const baseUrl = getBaseUrl();
             const exerciseId = document.getElementById('modal-exercise-id').value;
             const targetSets = document.getElementById('target-sets').value;
             const targetReps = document.getElementById('target-reps').value;
@@ -236,38 +190,26 @@ document.addEventListener('DOMContentLoaded', function() {
             const notes = document.getElementById('exercise-notes').value;
             const mode = this.getAttribute('data-mode') || 'add';
 
-            let url;
-            if (mode === 'edit') {
-                // Update existing exercise targets
-                url = baseUrl.startsWith('/templates')
-                    ? `/workouts${baseUrl.replace('/templates', '')}/exercises/${exerciseId}/update-targets`
-                    : `${baseUrl}/exercises/${exerciseId}/update-targets`;
-            } else {
-                // Add new exercise
-                url = baseUrl.startsWith('/templates')
-                    ? `/workouts${baseUrl.replace('/templates', '')}/exercises/add`
-                    : `${baseUrl}/exercises/add`;
-            }
+            const action = mode === 'edit' ? `${exerciseId}/update-targets` : 'add';
+            const url = isTemplate
+                ? `/workouts/${entityId}/exercises/${action}`
+                : `${baseUrl}/exercises/${action}`;
 
-            // Send AJAX request
             fetch(url, {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/x-www-form-urlencoded',
-                },
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
                 body: new URLSearchParams({
-                    'exercise_id': exerciseId,
-                    'target_sets': targetSets,
-                    'target_reps': targetReps,
-                    'target_weight': targetWeight,
-                    'target_duration': targetDuration,
-                    'notes': notes
+                    exercise_id: exerciseId,
+                    target_sets: targetSets,
+                    target_reps: targetReps,
+                    target_weight: targetWeight,
+                    target_duration: targetDuration,
+                    notes: notes
                 })
             })
             .then(response => response.json())
             .then(data => {
                 if (data.success) {
-                    // Close modal and reload page
                     bootstrap.Modal.getInstance(document.getElementById('exerciseModal')).hide();
                     location.reload();
                 } else {
@@ -280,98 +222,220 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
-    // Remove exercise button click handler
-    document.querySelectorAll('.remove-exercise').forEach(button => {
-        button.addEventListener('click', function() {
-            if (!confirm('Remove this exercise from the workout?')) {
+    // ===== SUPERSET ROUNDS (workouts only) =====
+
+    document.querySelectorAll('.superset-rounds-input').forEach(input => {
+        input.addEventListener('change', async function() {
+            const supersetId = this.dataset.supersetId;
+            const targetReps = this.value;
+
+            const formData = new FormData();
+            if (targetReps) formData.append('target_reps', targetReps);
+
+            postAction(`/workouts/${entityId}/superset/${supersetId}/update-reps`, formData);
+        });
+    });
+
+    // ===== SUPERSET SELECTION MODE =====
+
+    let selectionMode = false;
+    let selectedExercises = new Set();
+
+    const toggleSelectionBtn = document.getElementById('toggle-selection-mode');
+    const supersetToolbar = document.getElementById('superset-toolbar');
+    const createSupersetBtn = document.getElementById('create-superset-btn');
+    const cancelSelectionBtn = document.getElementById('cancel-selection-btn');
+    const selectedCountBadge = document.getElementById('selected-count');
+
+    function enterSelectionMode() {
+        selectionMode = true;
+        selectedExercises.clear();
+        supersetToolbar.style.display = 'flex';
+        toggleSelectionBtn.classList.add('active');
+        toggleSelectionBtn.innerHTML = '<i class="fa-solid fa-check"></i> Done';
+
+        document.querySelectorAll('.exercise-selectable').forEach(item => {
+            if (!item.dataset.supersetId) {
+                item.addEventListener('click', handleExerciseSelection);
+                item.style.cursor = 'pointer';
+            }
+        });
+        updateSelectedCount();
+    }
+
+    function exitSelectionMode() {
+        selectionMode = false;
+        selectedExercises.clear();
+        supersetToolbar.style.display = 'none';
+        toggleSelectionBtn.classList.remove('active');
+        toggleSelectionBtn.innerHTML = '<i class="fa-solid fa-layer-group"></i> Superset Mode';
+
+        document.querySelectorAll('.exercise-selectable').forEach(item => {
+            item.classList.remove('selected');
+            item.removeEventListener('click', handleExerciseSelection);
+            item.style.cursor = '';
+        });
+    }
+
+    function handleExerciseSelection(e) {
+        if (e.target.closest('button') || e.target.closest('.btn-group')) return;
+
+        const exerciseId = this.dataset.exerciseId;
+        if (selectedExercises.has(exerciseId)) {
+            selectedExercises.delete(exerciseId);
+            this.classList.remove('selected');
+        } else {
+            selectedExercises.add(exerciseId);
+            this.classList.add('selected');
+        }
+        updateSelectedCount();
+    }
+
+    function updateSelectedCount() {
+        const count = selectedExercises.size;
+        selectedCountBadge.textContent = `${count} selected`;
+
+        if (count >= 2) {
+            createSupersetBtn.disabled = false;
+            selectedCountBadge.classList.remove('bg-secondary');
+            selectedCountBadge.classList.add('bg-success');
+        } else {
+            createSupersetBtn.disabled = true;
+            selectedCountBadge.classList.remove('bg-success');
+            selectedCountBadge.classList.add('bg-secondary');
+        }
+    }
+
+    if (toggleSelectionBtn) {
+        toggleSelectionBtn.addEventListener('click', function() {
+            selectionMode = !selectionMode;
+            if (selectionMode) enterSelectionMode();
+            else exitSelectionMode();
+        });
+    }
+
+    if (cancelSelectionBtn) {
+        cancelSelectionBtn.addEventListener('click', function() {
+            exitSelectionMode();
+        });
+    }
+
+    if (createSupersetBtn) {
+        createSupersetBtn.addEventListener('click', async function() {
+            if (selectedExercises.size < 2) return;
+
+            const formData = new FormData();
+            selectedExercises.forEach(id => {
+                formData.append('exercise_ids[]', id);
+            });
+
+            postAction(supersetUrl('create'), formData);
+        });
+    }
+
+    // ===== AJAX SEARCH AND FILTER =====
+
+    const exerciseSearch = document.getElementById('exercise-search');
+    const categoryFilter = document.getElementById('category-filter');
+    const muscleFilter = document.getElementById('muscle-filter');
+
+    let searchTimeout;
+
+    if (exerciseSearch) {
+        exerciseSearch.addEventListener('input', function() {
+            clearTimeout(searchTimeout);
+            const query = this.value;
+
+            // If search is cleared, apply filters only (or reload)
+            if (query.length === 0) {
+                applyFilters();
                 return;
             }
 
-            const baseUrl = getBaseUrl();
-            const exerciseId = this.getAttribute('data-exercise-id');
+            searchTimeout = setTimeout(async () => {
+                if (query.length < 2) return;
 
-            // Determine correct endpoint
-            const removeUrl = baseUrl.startsWith('/templates')
-                ? `/workouts${baseUrl.replace('/templates', '')}/exercises/${exerciseId}/remove`
-                : `${baseUrl}/exercises/${exerciseId}/remove`;
-
-            fetch(removeUrl, {
-                method: 'POST'
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.success) {
-                    location.reload();
-                } else {
-                    alert('Error removing exercise: ' + (data.error || 'Unknown error'));
+                try {
+                    const response = await fetch(`/exercises/search?q=${encodeURIComponent(query)}`);
+                    const data = await response.json();
+                    updateExerciseList(data.exercises);
+                } catch (error) {
+                    console.error('Error searching exercises:', error);
                 }
-            })
-            .catch(error => {
-                alert('Error removing exercise: ' + error);
-            });
+            }, 300);
         });
-    });
+    }
 
-    // Duplicate exercise button click handler
-    document.querySelectorAll('.duplicate-exercise').forEach(button => {
-        button.addEventListener('click', function() {
-            const baseUrl = getBaseUrl();
-            const exerciseId = this.getAttribute('data-exercise-id');
+    if (categoryFilter) {
+        categoryFilter.addEventListener('change', applyFilters);
+    }
+    if (muscleFilter) {
+        muscleFilter.addEventListener('change', applyFilters);
+    }
 
-            // Determine correct endpoint
-            const duplicateUrl = baseUrl.startsWith('/templates')
-                ? `/workouts${baseUrl.replace('/templates', '')}/exercises/${exerciseId}/duplicate`
-                : `${baseUrl}/exercises/${exerciseId}/duplicate`;
+    async function applyFilters() {
+        const category = categoryFilter ? categoryFilter.value : '';
+        const muscle = muscleFilter ? muscleFilter.value : '';
+        const search = exerciseSearch ? exerciseSearch.value : '';
 
-            fetch(duplicateUrl, {
-                method: 'POST'
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.success) {
-                    location.reload();
-                } else {
-                    alert('Error duplicating exercise: ' + (data.error || 'Unknown error'));
-                }
-            })
-            .catch(error => {
-                alert('Error duplicating exercise: ' + error);
-            });
+        // If everything is cleared, reload to show original list
+        if (!category && !muscle && !search) {
+            location.reload();
+            return;
+        }
+
+        // If only search is active, let the search handler deal with it
+        if (search.length >= 2 && !category && !muscle) return;
+
+        try {
+            const params = new URLSearchParams();
+            if (category) params.append('category', category);
+            if (muscle) params.append('muscle', muscle);
+            if (search) params.append('q', search);
+            params.append('limit', 100);
+
+            const response = await fetch(`/exercises/filter?${params.toString()}`);
+            const data = await response.json();
+            updateExerciseList(data.exercises);
+        } catch (error) {
+            console.error('Error filtering exercises:', error);
+        }
+    }
+
+    function updateExerciseList(exercises) {
+        const listDiv = document.getElementById('exercise-list');
+        if (!listDiv) return;
+        listDiv.innerHTML = '';
+
+        exercises.forEach(exercise => {
+            const card = document.createElement('div');
+            card.className = 'card mb-2 exercise-item';
+
+            card.innerHTML = `
+                <div class="card-body p-2">
+                    <div class="d-flex justify-content-between align-items-start">
+                        <div class="flex-grow-1">
+                            <h6 class="mb-1">${exercise.name}</h6>
+                            <small class="text-muted d-block">${exercise.category_name || ''}</small>
+                        </div>
+                        <div class="btn-group">
+                            <button class="btn btn-sm btn-info btn-touch view-exercise-details"
+                                    data-exercise-id="${exercise.id}"
+                                    data-exercise-name="${exercise.name}"
+                                    title="View details">
+                                <i class="fa-solid fa-circle-info"></i>
+                            </button>
+                            <button class="btn btn-sm btn-primary btn-touch add-exercise"
+                                    data-exercise-id="${exercise.id}"
+                                    data-exercise-name="${exercise.name}"
+                                    title="Add to workout">
+                                <i class="fa-solid fa-plus"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            `;
+            listDiv.appendChild(card);
         });
-    });
-
-    // Reorder exercise button click handler
-    document.querySelectorAll('.reorder-exercise').forEach(button => {
-        button.addEventListener('click', function() {
-            const baseUrl = getBaseUrl();
-            const exerciseId = this.getAttribute('data-exercise-id');
-            const direction = this.getAttribute('data-direction');
-
-            // Determine correct endpoint
-            const reorderUrl = baseUrl.startsWith('/templates')
-                ? `/workouts${baseUrl.replace('/templates', '')}/exercises/${exerciseId}/reorder`
-                : `${baseUrl}/exercises/${exerciseId}/reorder`;
-
-            fetch(reorderUrl, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/x-www-form-urlencoded',
-                },
-                body: new URLSearchParams({
-                    'direction': direction
-                })
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.success) {
-                    location.reload();
-                } else {
-                    alert('Error reordering exercise: ' + (data.error || 'Unknown error'));
-                }
-            })
-            .catch(error => {
-                alert('Error reordering exercise: ' + error);
-            });
-        });
-    });
+    }
 });
