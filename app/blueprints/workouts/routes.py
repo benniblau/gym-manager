@@ -421,7 +421,10 @@ def log(workout_id):
 
         # Mark workout as in_progress if not already
         if workout.status == 'planned':
-            workout.update(status='in_progress', started_at=datetime.now())
+            update_params = {'status': 'in_progress'}
+            if not workout.started_at:
+                update_params['started_at'] = datetime.now()
+            workout.update(**update_params)
 
         flash('Workout logged successfully!', 'success')
         return redirect(url_for('workouts.log', workout_id=workout_id))
@@ -455,7 +458,10 @@ def update_exercise(workout_id, workout_exercise_id):
 
     # Mark workout as in_progress if not already
     if workout.status == 'planned':
-        workout.update(status='in_progress', started_at=datetime.now())
+        update_params = {'status': 'in_progress'}
+        if not workout.started_at:
+            update_params['started_at'] = datetime.now()
+        workout.update(**update_params)
 
     return jsonify({'success': True})
 
@@ -469,7 +475,10 @@ def start(workout_id):
     if not workout or workout.user_id != current_user.id:
         abort(404)
 
-    workout.update(status='in_progress', started_at=datetime.now())
+    update_params = {'status': 'in_progress'}
+    if not workout.started_at:
+        update_params['started_at'] = datetime.now()
+    workout.update(**update_params)
 
     flash('Workout started! Good luck!', 'success')
     return redirect(url_for('workouts.log', workout_id=workout_id))
@@ -485,14 +494,14 @@ def complete(workout_id):
         abort(404)
 
     now = datetime.now()
-    update_params = {
-        'status': 'completed',
-        'completed_at': now
-    }
+    update_params = {'status': 'completed'}
 
-    # Determine started_at
+    # Only set completed_at if not already set
+    if not workout.completed_at:
+        update_params['completed_at'] = now
+
+    # Only set started_at if not already set
     if not workout.started_at:
-        # Try to use scheduled_date + scheduled_time as start
         if workout.scheduled_date and workout.scheduled_time:
             try:
                 start_dt = datetime.combine(
@@ -505,12 +514,16 @@ def complete(workout_id):
         else:
             update_params['started_at'] = now
 
-    # Calculate duration_minutes from the time difference
-    start = update_params.get('started_at') or (
-        datetime.fromisoformat(workout.started_at) if isinstance(workout.started_at, str) else workout.started_at
-    )
-    if start and start < now:
-        update_params['duration_minutes'] = int((now - start).total_seconds() / 60)
+    # Only calculate duration if not already set
+    if not workout.duration_minutes:
+        start = update_params.get('started_at') or (
+            datetime.fromisoformat(workout.started_at) if isinstance(workout.started_at, str) else workout.started_at
+        )
+        end = update_params.get('completed_at') or (
+            datetime.fromisoformat(workout.completed_at) if isinstance(workout.completed_at, str) else workout.completed_at
+        )
+        if start and end and start < end:
+            update_params['duration_minutes'] = int((end - start).total_seconds() / 60)
 
     workout.update(**update_params)
 
