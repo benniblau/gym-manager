@@ -305,8 +305,6 @@ function copyPostText() {
 function shareWorkout() {
     // Build share text
     const lines = [];
-    lines.push('{{ workout.name }}');
-    lines.push('');
     lines.push('📅 {{ workout.scheduled_date }}');
     {% if workout.scheduled_time %}
     lines.push('🕐 {{ workout.scheduled_time }}');
@@ -366,7 +364,8 @@ function shareWorkout() {
             text: shareText
         }).catch(() => {});
     } else {
-        navigator.clipboard.writeText(shareText).then(() => {
+        const clipboardText = shareTitle + '\n\n' + shareText;
+        navigator.clipboard.writeText(clipboardText).then(() => {
             const btn = document.getElementById('share-workout-btn');
             const original = btn.innerHTML;
             btn.innerHTML = '<i class="fa-solid fa-check"></i> Copied to clipboard!';
