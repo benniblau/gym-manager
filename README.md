@@ -2,6 +2,8 @@
 
 A Flask web application for planning, logging, and analyzing workouts. Built with Python, SQLite, and Bootstrap 5.
 
+<img width="1264" height="1067" alt="ARISE_templates" src="https://github.com/user-attachments/assets/7d84dfb0-c1c3-4e0d-8721-68f91f2fa3e1" />
+
 ## Features
 
 - **Workout management** — Create, schedule, log, and complete workouts
