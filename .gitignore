@@ -35,6 +35,7 @@ instance/
 .env
 .env.local
 .env.*.local
+CLAUDE.md
 
 # Database
 *.db
