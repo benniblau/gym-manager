@@ -54,6 +54,9 @@ instance/
 # Claude Code
 .claude/
 
+# FontAwesome Pro (use CDN instead — see base.html)
+app/static/fontawesome/
+
 # Logs
 *.log
 logs/
