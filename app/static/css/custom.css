@@ -1040,6 +1040,45 @@ h6 i[class*=" fa-"] {
     text-align: center;
 }
 
+/* ===== DRAG AND DROP STYLES ===== */
+
+.drag-handle {
+    cursor: grab;
+    color: var(--bs-gray-500);
+    opacity: 0.45;
+    padding: 0 2px;
+    touch-action: none;
+    user-select: none;
+    flex-shrink: 0;
+}
+
+.drag-handle:hover {
+    opacity: 0.85;
+    color: #7a09b3;
+}
+
+.drag-handle:active {
+    cursor: grabbing;
+}
+
+/* Ghost placeholder shown during drag */
+.sortable-ghost {
+    opacity: 0.35;
+    background-color: rgba(122, 9, 179, 0.15) !important;
+    border: 2px dashed #7a09b3 !important;
+}
+
+/* Element currently being dragged */
+.sortable-chosen {
+    background-color: rgba(122, 9, 179, 0.1) !important;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+}
+
+/* Superset group ghost during drag */
+.superset-group.sortable-ghost {
+    border-left-color: rgba(122, 9, 179, 0.5) !important;
+}
+
 /* Mobile responsive adjustments */
 @media (max-width: 768px) {
     .superset-header {

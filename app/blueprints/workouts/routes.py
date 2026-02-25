@@ -395,6 +395,28 @@ def reorder_exercise(workout_id, workout_exercise_id):
     return jsonify({'success': True})
 
 
+@workouts_bp.route('/<int:workout_id>/exercises/set-order', methods=['POST'])
+@login_required
+def set_exercise_order(workout_id):
+    """Bulk reorder all exercises via drag-and-drop (AJAX endpoint)"""
+    workout = Workout.get_by_id(workout_id)
+
+    if not workout or workout.user_id != current_user.id:
+        return jsonify({'error': 'Unauthorized'}), 403
+
+    data = request.get_json()
+    if not data or 'order' not in data:
+        return jsonify({'error': 'Invalid data'}), 400
+
+    exercise_ids = data['order']
+    if not exercise_ids:
+        return jsonify({'error': 'No exercises provided'}), 400
+
+    WorkoutExercise.set_order(workout_id, exercise_ids)
+
+    return jsonify({'success': True})
+
+
 @workouts_bp.route('/<int:workout_id>/log', methods=['GET', 'POST'])
 @login_required
 def log(workout_id):

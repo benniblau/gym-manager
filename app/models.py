@@ -843,6 +843,18 @@ class WorkoutExercise:
 
         db.commit()
 
+    @staticmethod
+    def set_order(workout_id, exercise_ids):
+        """Set absolute order for all exercises in a workout given an ordered list of IDs"""
+        db = get_db()
+        for i, exercise_id in enumerate(exercise_ids):
+            db.execute('''
+                UPDATE workout_exercises
+                SET order_position = ?
+                WHERE id = ? AND workout_id = ?
+            ''', (i + 1, exercise_id, workout_id))
+        db.commit()
+
     # ===== SUPERSET METHODS =====
 
     @staticmethod

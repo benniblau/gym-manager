@@ -222,6 +222,80 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
+    // ===== DRAG AND DROP REORDER =====
+
+    let topSortable = null;
+    const supersetSortables = [];
+
+    function collectOrder() {
+        const order = [];
+        if (!currentExercises) return order;
+        Array.from(currentExercises.children).forEach(child => {
+            if (child.classList.contains('list-group-item') && child.dataset.exerciseId) {
+                order.push(parseInt(child.dataset.exerciseId));
+            } else if (child.classList.contains('superset-group')) {
+                child.querySelectorAll(':scope > .list-group-item').forEach(item => {
+                    if (item.dataset.exerciseId) {
+                        order.push(parseInt(item.dataset.exerciseId));
+                    }
+                });
+            }
+        });
+        return order;
+    }
+
+    async function saveOrder() {
+        const order = collectOrder();
+        if (!order.length) return;
+        try {
+            const response = await fetch(`/workouts/${entityId}/exercises/set-order`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ order })
+            });
+            const data = await response.json();
+            if (data.success) {
+                location.reload();
+            } else {
+                alert('Failed to save order: ' + (data.error || 'Unknown error'));
+            }
+        } catch (error) {
+            console.error('Error saving order:', error);
+            alert('Failed to save order. Please try again.');
+        }
+    }
+
+    if (currentExercises && typeof Sortable !== 'undefined') {
+        // Top-level sortable: standalone exercises + superset groups
+        topSortable = Sortable.create(currentExercises, {
+            handle: '.drag-handle',
+            animation: 150,
+            ghostClass: 'sortable-ghost',
+            chosenClass: 'sortable-chosen',
+            draggable: '.list-group-item, .superset-group',
+            filter: '.superset-no-rest',
+            onEnd: saveOrder
+        });
+
+        // Within-superset sortable: exercises inside each superset group
+        document.querySelectorAll('.superset-group').forEach(group => {
+            const s = Sortable.create(group, {
+                handle: '.drag-handle',
+                animation: 150,
+                ghostClass: 'sortable-ghost',
+                chosenClass: 'sortable-chosen',
+                draggable: '.list-group-item',
+                onEnd: saveOrder
+            });
+            supersetSortables.push(s);
+        });
+    }
+
+    function setSortableDisabled(disabled) {
+        if (topSortable) topSortable.option('disabled', disabled);
+        supersetSortables.forEach(s => s.option('disabled', disabled));
+    }
+
     // ===== SUPERSET ROUNDS (workouts only) =====
 
     document.querySelectorAll('.superset-rounds-input').forEach(input => {
@@ -250,6 +324,7 @@ document.addEventListener('DOMContentLoaded', function() {
     function enterSelectionMode() {
         selectionMode = true;
         selectedExercises.clear();
+        setSortableDisabled(true);
         supersetToolbar.style.display = 'flex';
         toggleSelectionBtn.classList.add('active');
         toggleSelectionBtn.innerHTML = '<i class="fa-solid fa-check"></i> Done';
@@ -266,6 +341,7 @@ document.addEventListener('DOMContentLoaded', function() {
     function exitSelectionMode() {
         selectionMode = false;
         selectedExercises.clear();
+        setSortableDisabled(false);
         supersetToolbar.style.display = 'none';
         toggleSelectionBtn.classList.remove('active');
         toggleSelectionBtn.innerHTML = '<i class="fa-solid fa-layer-group"></i> Superset Mode';
