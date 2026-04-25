@@ -79,6 +79,7 @@ All configuration is via `.env`. See `.env.example` for available variables.
 | `GM_MCP_TRANSPORT` | No | MCP transport: `http` or `stdio` (default: `stdio`) |
 | `GM_MCP_HTTP_HOST` | No | MCP bind host (default: `0.0.0.0`) |
 | `GM_MCP_HTTP_PORT` | No | MCP bind port (default: `8085`) |
+| `GM_MCP_URL` | No | Public MCP base URL Flask redirects `/mcp` to (default: `http://127.0.0.1:8085`) |
 | `DATABASE_PATH` | No | Path to `exercises.db` (default: `./exercises.db`) |
 
 ### Strava Setup

@@ -65,6 +65,9 @@ def create_app(config_name='development'):
     from app.blueprints.templates import templates_bp
     app.register_blueprint(templates_bp, url_prefix='/templates')
 
+    from app.mcp_proxy import mcp_proxy_bp
+    app.register_blueprint(mcp_proxy_bp)  # MCP proxy at /mcp
+
     return app
 
 
