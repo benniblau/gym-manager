@@ -18,6 +18,7 @@ A Flask web application for planning, logging, and analyzing workouts. Built wit
 
 - **Backend**: Flask 3, SQLite (raw queries, no ORM), Flask-Login, Flask-Bcrypt, Flask-WTF
 - **Frontend**: Bootstrap 5 dark theme, FontAwesome 6 (CDN), Vanilla JS
+- **MCP server**: FastMCP, Starlette, Uvicorn — HTTP streaming transport on port 8085
 - **Production**: Gunicorn, systemd, Traefik reverse proxy
 
 ## Setup
@@ -74,7 +75,11 @@ All configuration is via `.env`. See `.env.example` for available variables.
 | `STRAVA_CLIENT_ID` | Strava only | Strava API client ID |
 | `STRAVA_CLIENT_SECRET` | Strava only | Strava API client secret |
 | `STRAVA_REDIRECT_URI` | Strava only | OAuth callback URL |
-| `PORT` | No | Production port (default: 8000) |
+| `PORT` | No | Gunicorn port (default: 8000) |
+| `GM_MCP_TRANSPORT` | No | MCP transport: `http` or `stdio` (default: `stdio`) |
+| `GM_MCP_HTTP_HOST` | No | MCP bind host (default: `0.0.0.0`) |
+| `GM_MCP_HTTP_PORT` | No | MCP bind port (default: `8085`) |
+| `DATABASE_PATH` | No | Path to `exercises.db` (default: `./exercises.db`) |
 
 ### Strava Setup
 
@@ -96,14 +101,56 @@ python migrations/add_invitations.py
 
 Each migration is idempotent and supports `--dry-run`.
 
+```bash
+python migrations/add_api_keys_table.py   # MCP API key storage
+```
+
+## MCP Server
+
+Gym Manager exposes a [Model Context Protocol](https://modelcontextprotocol.io) server so AI agents (Claude Code, Claude Desktop) can read and write your gym data directly.
+
+**Generate an API key** — log in, go to Settings → MCP API Keys, and click Generate Key. The raw key (`gm_…`) is shown once; copy it immediately.
+
+**Connect from Claude Code** — add to your MCP config:
+```json
+{
+  "gym-manager": {
+    "type": "http",
+    "url": "http://localhost:8085/mcp",
+    "headers": { "Authorization": "Bearer gm_<your-key>" }
+  }
+}
+```
+
+**Start the server:**
+```bash
+GM_MCP_TRANSPORT=http python -m mcp_server.server
+```
+
+**Available tools** (16 total):
+
+| Domain | Tools |
+|---|---|
+| Exercises | `search_exercises`, `get_exercise`, `list_categories`, `list_muscles`, `list_equipment` |
+| Workouts | `list_workouts`, `get_workout`, `create_workout`, `log_exercise`, `complete_workout` |
+| Templates | `list_templates`, `get_template`, `create_workout_from_template` |
+| Progress | `get_exercise_history`, `get_workout_stats`, `get_muscle_focus` |
+
+Read-scope keys can call all read tools. `create_workout`, `log_exercise`, `complete_workout`, and `create_workout_from_template` require readwrite scope. Every tool is scoped to the key owner's data.
+
 ## Production Deployment
 
-The project includes a systemd service file (`gym-manager.service`) and Gunicorn config (`gunicorn_config.py`) for Linux deployments. The app uses `ProxyFix` middleware for deployments behind a reverse proxy (Traefik/nginx).
+The project includes systemd service files in `deploy/` and a Gunicorn config (`gunicorn_config.py`) for Linux deployments. The app uses `ProxyFix` middleware for deployments behind a reverse proxy (Traefik/nginx).
 
 ```bash
-# Copy and edit the service file
-sudo cp gym-manager.service /etc/systemd/system/
-sudo systemctl enable --now gym-manager
+# Run the migration to add the api_keys table
+python migrations/add_api_keys_table.py
+
+# Copy and enable both service files
+sudo cp deploy/gym-manager.service /etc/systemd/system/
+sudo cp deploy/gym-manager-mcp.service /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl enable --now gym-manager gym-manager-mcp
 ```
 
 ## Project Structure
@@ -115,7 +162,7 @@ app/
 ├── models.py            # DB models (User, Workout, Exercise, etc.)
 ├── utils/               # TCX export, Jinja2 filters
 ├── blueprints/
-│   ├── auth/            # Login, register, settings, invitations
+│   ├── auth/            # Login, register, settings, invitations, API key management
 │   ├── main/            # Dashboard
 │   ├── workouts/        # Workout CRUD, logging, supersets
 │   ├── exercises/       # Exercise browser
@@ -130,7 +177,16 @@ app/
     ├── includes/        # Shared macros and modals
     └── ...              # Per-blueprint templates
 
+mcp_server/              # MCP server (FastMCP, HTTP streaming, port 8085)
+├── server.py            # Entry point — HTTP or stdio transport
+├── db.py                # Standalone SQLite connection
+├── auth.py              # AuthContext, resolve_auth
+├── middleware.py        # ASGI API key middleware
+├── api_key_repository.py  # Key CRUD (shared with Flask routes)
+└── tools/               # exercises, workouts, templates, progress
+
 migrations/              # Additive schema migration scripts
+deploy/                  # systemd service files
 docs/                    # UI design system documentation
 database.py              # DB initialization from exercises.json
 ```

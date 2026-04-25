@@ -272,6 +272,91 @@
         </div>
     </div>
 
+    <!-- MCP API Keys -->
+    <div class="card mb-4">
+        <div class="card-header">
+            <h5 class="mb-0"><i class="fa-solid fa-plug"></i> MCP API Keys</h5>
+        </div>
+        <div class="card-body">
+            <p class="mb-3 text-muted">
+                Bearer tokens for the Gym Manager MCP server (port 8085).
+                Each token only exposes your own data.
+            </p>
+
+            {% if new_api_key %}
+            <div class="alert alert-warning alert-dismissible fade show" role="alert">
+                <i class="fa-solid fa-triangle-exclamation"></i>
+                <strong>Copy this key now — it will not be shown again:</strong><br>
+                <code class="user-select-all fs-6">{{ new_api_key }}</code>
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            </div>
+            {% endif %}
+
+            {% if api_keys %}
+            <div class="table-responsive mb-3">
+                <table class="table table-sm table-dark table-bordered align-middle mb-0">
+                    <thead>
+                        <tr>
+                            <th>Key Prefix</th>
+                            <th>Scope</th>
+                            <th>Label</th>
+                            <th>Last Used</th>
+                            <th>Created</th>
+                            <th></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for key in api_keys %}
+                        <tr>
+                            <td><code>{{ key.key_prefix }}…</code></td>
+                            <td>
+                                {% if key.scope == 'readwrite' %}
+                                <span class="badge bg-warning text-dark">readwrite</span>
+                                {% else %}
+                                <span class="badge bg-secondary">read</span>
+                                {% endif %}
+                            </td>
+                            <td>{{ key.label or '—' }}</td>
+                            <td class="text-muted small">{{ key.last_used_at[:10] if key.last_used_at else 'Never' }}</td>
+                            <td class="text-muted small">{{ key.created_at[:10] }}</td>
+                            <td>
+                                <form method="POST" action="{{ url_for('auth.delete_api_key', key_id=key.id) }}"
+                                      onsubmit="return confirm('Revoke this API key? Any clients using it will stop working.')">
+                                    <button type="submit" class="btn btn-sm btn-outline-danger">
+                                        <i class="fa-solid fa-trash"></i> Revoke
+                                    </button>
+                                </form>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <p class="text-muted mb-3"><em>No API keys yet.</em></p>
+            {% endif %}
+
+            <form method="POST" action="{{ url_for('auth.create_api_key') }}" class="row g-2 align-items-end">
+                <div class="col-md-5">
+                    <label class="form-label fw-bold mb-1">Label <span class="text-muted fw-normal">(optional)</span></label>
+                    <input type="text" name="label" class="form-control" placeholder="e.g. Claude Code">
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label fw-bold mb-1">Scope</label>
+                    <select name="scope" class="form-select">
+                        <option value="read">read</option>
+                        <option value="readwrite">readwrite</option>
+                    </select>
+                </div>
+                <div class="col-md-4">
+                    <button type="submit" class="btn btn-primary btn-touch w-100">
+                        <i class="fa-solid fa-key"></i> Generate Key
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
     <!-- Account Actions -->
     <div class="card border-danger mb-4">
         <div class="card-header bg-danger text-white">

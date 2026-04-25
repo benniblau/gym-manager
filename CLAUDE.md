@@ -21,6 +21,12 @@ python database.py
 
 # Run migration scripts (additive, idempotent)
 python migrations/<script_name>.py
+
+# MCP server — HTTP streaming transport (port 8085)
+GM_MCP_TRANSPORT=http python -m mcp_server.server
+
+# MCP server — stdio transport (for Claude Desktop)
+GM_API_KEY=gm_<key> python -m mcp_server.server
 ```
 
 No test suite or linter is configured yet.
@@ -49,9 +55,21 @@ No test suite or linter is configured yet.
 
 **Production:** `ProxyFix` middleware with `x_for=2, x_proto=2, x_host=2, x_prefix=2` for Pangolin → Traefik → Flask topology.
 
+## MCP Server
+
+Standalone FastMCP server exposing gym data over HTTP streaming (MCP spec 2025-03-26). Entry point: `python -m mcp_server.server`.
+
+**Module layout:** `mcp_server/server.py` (entry), `mcp_server/db.py` (SQLite), `mcp_server/auth.py` (AuthContext + resolve_auth), `mcp_server/middleware.py` (ASGI auth), `mcp_server/api_key_repository.py` (key CRUD), `mcp_server/tools/` (exercises, workouts, templates, progress).
+
+**API keys:** Generated per-user from `/auth/settings` → MCP API Keys. Stored hashed in the `api_keys` table. Raw key shown once; prefix stored for identification. Key format: `gm_<32 hex chars>`. Two scopes: `read` and `readwrite`.
+
+**Auth:** HTTP transport uses `Authorization: Bearer gm_<key>` or `X-API-Key: gm_<key>` header per request (ASGI middleware). Stdio transport validates `GM_API_KEY` env var once at startup. Each key is scoped to one user — tools only return that user's data.
+
+**Transport env vars:** `GM_MCP_TRANSPORT` (`http`/`stdio`), `GM_MCP_HTTP_HOST`, `GM_MCP_HTTP_PORT` (default 8085), `DATABASE_PATH`.
+
 ## Database Schema Notes
 
-Key tables: `users`, `workouts` (also stores templates via `is_template=1`), `workout_exercises`, `exercises`, `categories`, `muscles`, `equipment`, `invitations`, `strava_connections`, `strava_uploads`.
+Key tables: `users`, `workouts` (also stores templates via `is_template=1`), `workout_exercises`, `exercises`, `categories`, `muscles`, `equipment`, `invitations`, `strava_connections`, `strava_uploads`, `api_keys`.
 
 - `workouts.status`: `planned` / `in_progress` / `completed`
 - `workouts.is_template`: `0` = workout, `1` = template

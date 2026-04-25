@@ -1,0 +1,42 @@
+[Unit]
+Description=Gym Manager (Flask/Gunicorn)
+Documentation=https://github.com/benniblau/gym-manager
+After=network.target
+Wants=network.target
+
+[Service]
+Type=notify
+NotifyAccess=all
+
+User=gym-manager
+Group=gym-manager
+WorkingDirectory=/opt/gym-manager
+
+EnvironmentFile=/opt/gym-manager/.env
+Environment=FLASK_ENV=production
+
+ExecStart=/opt/gym-manager/venv/bin/gunicorn \
+    --config gunicorn_config.py \
+    --worker-class sync \
+    wsgi:app
+
+# Restart policy
+Restart=on-failure
+RestartSec=5
+StartLimitIntervalSec=60
+StartLimitBurst=3
+
+# Logging — goes to journald, read with: journalctl -u gym-manager -f
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=gym-manager
+
+# Hardening
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ReadWritePaths=/opt/gym-manager
+ProtectHome=true
+
+[Install]
+WantedBy=multi-user.target

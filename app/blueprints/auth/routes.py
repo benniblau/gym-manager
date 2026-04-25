@@ -1,9 +1,10 @@
-from flask import Blueprint, render_template, redirect, url_for, flash, request, abort
+from flask import Blueprint, render_template, redirect, url_for, flash, request, abort, session
 from flask_login import login_user, logout_user, login_required, current_user
 from urllib.parse import urlparse
 
 from app.blueprints.auth.forms import RegistrationForm, LoginForm, UpdateEmailForm, UpdatePasswordForm, UpdateStravaCredentialsForm, InviteForm
-from app.models import User, StravaConnection, Invitation
+from app.models import User, StravaConnection, Invitation, get_db
+from mcp_server.api_key_repository import ApiKeyRepository
 
 auth_bp = Blueprint('auth', __name__)
 
@@ -95,11 +96,16 @@ def settings():
         strava_form.athlete_id.data = str(strava_connection.get('athlete_id', '')) if strava_connection.get('athlete_id') else ''
         strava_form.athlete_username.data = strava_connection.get('athlete_username', '')
 
+    api_keys = ApiKeyRepository(get_db()).get_keys_for_user(current_user.id)
+    new_api_key = session.pop('new_api_key', None)
+
     return render_template('auth/settings.html',
                          email_form=email_form,
                          password_form=password_form,
                          strava_form=strava_form,
-                         strava_connection=strava_connection)
+                         strava_connection=strava_connection,
+                         api_keys=api_keys,
+                         new_api_key=new_api_key)
 
 
 @auth_bp.route('/settings/update-email', methods=['POST'])
@@ -180,6 +186,34 @@ def update_strava_credentials():
             for error in errors:
                 flash(f'{error}', 'danger')
 
+    return redirect(url_for('auth.settings'))
+
+
+@auth_bp.route('/settings/api-keys/create', methods=['POST'])
+@login_required
+def create_api_key():
+    """Generate a new MCP API key for the current user."""
+    scope = request.form.get('scope', 'read')
+    label = request.form.get('label', '').strip() or None
+
+    if scope not in ('read', 'readwrite'):
+        flash('Invalid scope.', 'danger')
+        return redirect(url_for('auth.settings'))
+
+    result = ApiKeyRepository(get_db()).create_key(current_user.id, scope=scope, label=label)
+    session['new_api_key'] = result['raw_key']
+    return redirect(url_for('auth.settings'))
+
+
+@auth_bp.route('/settings/api-keys/<int:key_id>/delete', methods=['POST'])
+@login_required
+def delete_api_key(key_id):
+    """Revoke an MCP API key belonging to the current user."""
+    deleted = ApiKeyRepository(get_db()).delete_key(key_id, current_user.id)
+    if deleted:
+        flash('API key revoked.', 'success')
+    else:
+        flash('Key not found.', 'danger')
     return redirect(url_for('auth.settings'))
 
 

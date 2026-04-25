@@ -1,0 +1,42 @@
+[Unit]
+Description=Gym Manager MCP Server (FastMCP/Uvicorn)
+Documentation=https://github.com/benniblau/gym-manager
+After=network.target
+Wants=network.target
+
+[Service]
+Type=simple
+
+User=gym-manager
+Group=gym-manager
+WorkingDirectory=/opt/gym-manager
+
+EnvironmentFile=/opt/gym-manager/.env
+Environment=GM_MCP_TRANSPORT=http
+Environment=GM_MCP_HTTP_HOST=0.0.0.0
+Environment=GM_MCP_HTTP_PORT=8085
+# DATABASE_PATH defaults to WorkingDirectory/exercises.db — override here if needed
+# Environment=DATABASE_PATH=/opt/gym-manager/exercises.db
+
+ExecStart=/opt/gym-manager/venv/bin/python -m mcp_server.server --transport http
+
+# Restart policy
+Restart=on-failure
+RestartSec=5
+StartLimitIntervalSec=60
+StartLimitBurst=3
+
+# Logging — goes to journald, read with: journalctl -u gym-manager-mcp -f
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=gym-manager-mcp
+
+# Hardening
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ReadWritePaths=/opt/gym-manager
+ProtectHome=true
+
+[Install]
+WantedBy=multi-user.target
