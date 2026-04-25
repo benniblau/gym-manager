@@ -67,7 +67,7 @@ Standalone FastMCP server exposing gym data over HTTP streaming (MCP spec 2025-0
 
 **Transport env vars:** `GM_MCP_TRANSPORT` (`http`/`stdio`), `GM_MCP_HTTP_HOST`, `GM_MCP_HTTP_PORT` (default 8085), `DATABASE_PATH`.
 
-**`/mcp` proxy:** `app/mcp_proxy/routes.py` — Flask blueprint that issues a 307 redirect from `<appurl>/mcp` to `GM_MCP_URL/mcp` (default `http://127.0.0.1:8085`). In production set `GM_MCP_URL` to the publicly reachable MCP server URL so clients can follow the redirect.
+**`/mcp` proxy:** `app/mcp_proxy/routes.py` — Flask blueprint that reverse-proxies `<appurl>/mcp` to `GM_MCP_URL/mcp` (default `http://127.0.0.1:8085`). Streams the response back so SSE works. The MCP server does not need to be publicly exposed — all traffic goes Flask → MCP internally.
 
 ## Database Schema Notes
 
