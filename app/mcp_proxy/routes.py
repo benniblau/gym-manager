@@ -28,7 +28,9 @@ def _mcp_url() -> str:
 
 @mcp_proxy_bp.route("/mcp", methods=["GET", "POST", "DELETE", "PUT", "OPTIONS"], strict_slashes=False)
 def mcp():
-    target = f"{_mcp_url()}/mcp"
+    # Always target /mcp/ with trailing slash — Starlette's Mount redirects /mcp
+    # to /mcp/ with a 307; targeting /mcp/ directly skips that redirect entirely.
+    target = f"{_mcp_url()}/mcp/"
 
     fwd_headers = {
         k: v for k, v in request.headers
@@ -41,6 +43,7 @@ def mcp():
         headers=fwd_headers,
         data=request.get_data(),
         stream=True,
+        allow_redirects=False,  # never follow upstream redirects — stream them as-is
         timeout=60,
     )
 
