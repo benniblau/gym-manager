@@ -128,16 +128,19 @@ Gym Manager exposes a [Model Context Protocol](https://modelcontextprotocol.io) 
 GM_MCP_TRANSPORT=http python -m mcp_server.server
 ```
 
-**Available tools** (16 total):
+**Available tools** (22 total):
 
 | Domain | Tools |
 |---|---|
 | Exercises | `search_exercises`, `get_exercise`, `list_categories`, `list_muscles`, `list_equipment` |
 | Workouts | `list_workouts`, `get_workout`, `create_workout`, `log_exercise`, `complete_workout` |
-| Templates | `list_templates`, `get_template`, `create_workout_from_template` |
+| Templates | `list_templates`, `get_template`, `create_template`, `update_template`, `delete_template`, `create_workout_from_template` |
+| Exercise entries | `add_workout_exercise`, `update_workout_exercise`, `remove_workout_exercise` (operate on workouts **and** templates) |
 | Progress | `get_exercise_history`, `get_workout_stats`, `get_muscle_focus` |
 
-Read-scope keys can call all read tools. `create_workout`, `log_exercise`, `complete_workout`, and `create_workout_from_template` require readwrite scope. Every tool is scoped to the key owner's data.
+Read-scope keys can call all read tools. All write tools — `create_workout`, `log_exercise`, `complete_workout`, `create_workout_from_template`, `create_template`, `update_template`, `delete_template`, `add_workout_exercise`, `update_workout_exercise`, `remove_workout_exercise` — require readwrite scope. Every tool is scoped to the key owner's data.
+
+Templates and workouts share the same underlying tables (a template is a workout row with `is_template = 1`), so the `*_workout_exercise` entry tools take either one's ID as their `workout_id` argument — build a template's exercise list the same way you'd build a workout's.
 
 ## Production Deployment
 

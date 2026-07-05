@@ -198,6 +198,179 @@ def register_workout_tools(mcp, conn: sqlite3.Connection) -> None:
         return {"updated": True}
 
     @mcp.tool()
+    def add_workout_exercise(
+        workout_id: int,
+        exercise_id: int,
+        order_position: Optional[int] = None,
+        target_sets: Optional[int] = None,
+        target_reps: Optional[int] = None,
+        target_weight: Optional[float] = None,
+        target_duration: Optional[int] = None,
+        superset_group_id: Optional[int] = None,
+        notes: Optional[str] = None,
+    ) -> dict:
+        """Add an exercise to a workout or template.
+
+        Works for both workouts and templates — pass either one's ID as
+        workout_id (both are rows in the workouts table). Only the owner may add
+        exercises. If order_position is omitted, the exercise is appended to the end.
+
+        Args:
+            workout_id: The workout OR template ID to add the exercise to.
+            exercise_id: The exercise library ID (from search_exercises / get_exercise).
+            order_position: 0-based position; omit to append after the last exercise.
+            target_sets: Planned number of sets.
+            target_reps: Planned reps per set.
+            target_weight: Planned weight (kg or lb).
+            target_duration: Planned duration in seconds.
+            superset_group_id: Group ID to link this exercise into a superset.
+            notes: Optional per-exercise note.
+
+        Returns:
+            Dict with {workout_exercise_id, order_position}.
+        """
+        auth = get_current_auth()
+        if not auth.can_write():
+            raise PermissionError("readwrite scope required")
+
+        parent = conn.execute(
+            "SELECT id FROM workouts WHERE id = ? AND user_id = ?",
+            (workout_id, auth.user_id),
+        ).fetchone()
+        if not parent:
+            raise ValueError(f"Workout {workout_id} not found")
+
+        exists = conn.execute(
+            "SELECT id FROM exercises WHERE id = ?", (exercise_id,)
+        ).fetchone()
+        if not exists:
+            raise ValueError(f"Exercise {exercise_id} not found")
+
+        if order_position is None:
+            order_position = conn.execute(
+                """SELECT COALESCE(MAX(order_position), -1) + 1 AS next
+                   FROM workout_exercises WHERE workout_id = ?""",
+                (workout_id,),
+            ).fetchone()["next"]
+
+        now = datetime.now(timezone.utc).isoformat()
+        cursor = conn.execute(
+            """INSERT INTO workout_exercises
+               (workout_id, exercise_id, order_position, target_sets, target_reps,
+                target_weight, target_duration, superset_group_id, notes,
+                created_at, updated_at)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            (
+                workout_id, exercise_id, order_position, target_sets, target_reps,
+                target_weight, target_duration, superset_group_id, notes, now, now,
+            ),
+        )
+        conn.commit()
+        return {"workout_exercise_id": cursor.lastrowid, "order_position": order_position}
+
+    @mcp.tool()
+    def update_workout_exercise(
+        workout_exercise_id: int,
+        order_position: Optional[int] = None,
+        target_sets: Optional[int] = None,
+        target_reps: Optional[int] = None,
+        target_weight: Optional[float] = None,
+        target_duration: Optional[int] = None,
+        superset_group_id: Optional[int] = None,
+        notes: Optional[str] = None,
+    ) -> dict:
+        """Update an exercise entry's planned targets, order, or superset grouping.
+
+        Works for entries in both workouts and templates. Only the owner may
+        update. To log what was actually performed, use log_exercise instead.
+        Omitted fields are left unchanged.
+
+        Args:
+            workout_exercise_id: The workout_exercises row ID.
+            order_position: New 0-based position.
+            target_sets: New planned sets.
+            target_reps: New planned reps.
+            target_weight: New planned weight.
+            target_duration: New planned duration in seconds.
+            superset_group_id: New superset group ID.
+            notes: New per-exercise note.
+
+        Returns:
+            Dict with {updated: true} on success.
+        """
+        auth = get_current_auth()
+        if not auth.can_write():
+            raise PermissionError("readwrite scope required")
+
+        row = conn.execute(
+            """SELECT we.id FROM workout_exercises we
+               JOIN workouts w ON w.id = we.workout_id
+               WHERE we.id = ? AND w.user_id = ?""",
+            (workout_exercise_id, auth.user_id),
+        ).fetchone()
+        if not row:
+            raise ValueError(f"WorkoutExercise {workout_exercise_id} not found")
+
+        fields = {
+            "order_position": order_position,
+            "target_sets": target_sets,
+            "target_reps": target_reps,
+            "target_weight": target_weight,
+            "target_duration": target_duration,
+            "superset_group_id": superset_group_id,
+            "notes": notes,
+        }
+        updates, params = [], []
+        for col, val in fields.items():
+            if val is not None:
+                updates.append(f"{col} = ?")
+                params.append(val)
+        if not updates:
+            raise ValueError("No fields provided to update")
+
+        updates.append("updated_at = ?")
+        params.append(datetime.now(timezone.utc).isoformat())
+        params.append(workout_exercise_id)
+
+        conn.execute(
+            f"UPDATE workout_exercises SET {', '.join(updates)} WHERE id = ?",
+            params,
+        )
+        conn.commit()
+        return {"updated": True}
+
+    @mcp.tool()
+    def remove_workout_exercise(workout_exercise_id: int) -> dict:
+        """Remove an exercise entry from a workout or template.
+
+        Works for entries in both workouts and templates. Only the owner may remove.
+
+        Args:
+            workout_exercise_id: The workout_exercises row ID.
+
+        Returns:
+            Dict with {deleted: true} on success.
+        """
+        auth = get_current_auth()
+        if not auth.can_write():
+            raise PermissionError("readwrite scope required")
+
+        row = conn.execute(
+            """SELECT we.id FROM workout_exercises we
+               JOIN workouts w ON w.id = we.workout_id
+               WHERE we.id = ? AND w.user_id = ?""",
+            (workout_exercise_id, auth.user_id),
+        ).fetchone()
+        if not row:
+            raise ValueError(f"WorkoutExercise {workout_exercise_id} not found")
+
+        conn.execute(
+            "DELETE FROM workout_exercises WHERE id = ?", (workout_exercise_id,)
+        )
+        conn.commit()
+        return {"deleted": True}
+
+    @mcp.tool()
     def complete_workout(
         workout_id: int,
         duration_minutes: Optional[int] = None,

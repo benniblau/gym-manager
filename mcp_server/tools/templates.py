@@ -148,3 +148,123 @@ def register_template_tools(mcp, conn: sqlite3.Connection) -> None:
         conn.commit()
 
         return {"workout_id": workout_id}
+
+    @mcp.tool()
+    def create_template(
+        name: str,
+        notes: Optional[str] = None,
+        is_public: bool = False,
+    ) -> dict:
+        """Create a new, empty workout template for the current user.
+
+        A template is a reusable blueprint (is_template = 1). Add exercises to it
+        with add_workout_exercise, then instantiate workouts from it with
+        create_workout_from_template.
+
+        Args:
+            name: Template name.
+            notes: Optional template notes.
+            is_public: If True, other users can see and use this template.
+
+        Returns:
+            Dict with {template_id}.
+        """
+        auth = get_current_auth()
+        if not auth.can_write():
+            raise PermissionError("readwrite scope required")
+
+        now = datetime.now(timezone.utc).isoformat()
+        cursor = conn.execute(
+            """INSERT INTO workouts (user_id, name, notes, status,
+                                    is_template, is_public, created_at, updated_at)
+               VALUES (?, ?, ?, 'planned', 1, ?, ?, ?)""",
+            (auth.user_id, name, notes, 1 if is_public else 0, now, now),
+        )
+        conn.commit()
+        return {"template_id": cursor.lastrowid}
+
+    @mcp.tool()
+    def update_template(
+        template_id: int,
+        name: Optional[str] = None,
+        notes: Optional[str] = None,
+        is_public: Optional[bool] = None,
+    ) -> dict:
+        """Update a template's metadata (name, notes, visibility).
+
+        Only the owner may update a template. To change its exercises, use
+        add_workout_exercise / update_workout_exercise / remove_workout_exercise
+        with the template_id as the workout_id.
+
+        Args:
+            template_id: The template ID.
+            name: New name (omit to leave unchanged).
+            notes: New notes (omit to leave unchanged).
+            is_public: New visibility (omit to leave unchanged).
+
+        Returns:
+            Dict with {updated: true} on success.
+        """
+        auth = get_current_auth()
+        if not auth.can_write():
+            raise PermissionError("readwrite scope required")
+
+        row = conn.execute(
+            "SELECT id FROM workouts WHERE id = ? AND user_id = ? AND is_template = 1",
+            (template_id, auth.user_id),
+        ).fetchone()
+        if not row:
+            raise ValueError(f"Template {template_id} not found")
+
+        updates, params = [], []
+        if name is not None:
+            updates.append("name = ?")
+            params.append(name)
+        if notes is not None:
+            updates.append("notes = ?")
+            params.append(notes)
+        if is_public is not None:
+            updates.append("is_public = ?")
+            params.append(1 if is_public else 0)
+        if not updates:
+            raise ValueError("No fields provided to update")
+
+        updates.append("updated_at = ?")
+        params.append(datetime.now(timezone.utc).isoformat())
+        params.append(template_id)
+
+        conn.execute(
+            f"UPDATE workouts SET {', '.join(updates)} WHERE id = ?",
+            params,
+        )
+        conn.commit()
+        return {"updated": True}
+
+    @mcp.tool()
+    def delete_template(template_id: int) -> dict:
+        """Delete a template and all of its exercises.
+
+        Only the owner may delete a template. This does not affect workouts that
+        were previously created from the template.
+
+        Args:
+            template_id: The template ID.
+
+        Returns:
+            Dict with {deleted: true} on success.
+        """
+        auth = get_current_auth()
+        if not auth.can_write():
+            raise PermissionError("readwrite scope required")
+
+        row = conn.execute(
+            "SELECT id FROM workouts WHERE id = ? AND user_id = ? AND is_template = 1",
+            (template_id, auth.user_id),
+        ).fetchone()
+        if not row:
+            raise ValueError(f"Template {template_id} not found")
+
+        conn.execute("DELETE FROM workout_exercises WHERE workout_id = ?", (template_id,))
+        conn.execute("DELETE FROM workouts WHERE id = ?", (template_id,))
+        conn.commit()
+        return {"deleted": True}
