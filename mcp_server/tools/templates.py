@@ -52,8 +52,10 @@ def register_template_tools(mcp, conn: sqlite3.Connection) -> None:
 
         Returns:
             Dict with template fields plus an 'exercises' list. Each exercise has:
-            id, name, category, order_position, target_sets, target_reps,
-            target_weight, target_duration, superset_group_id.
+            id (the workout_exercises row id, e.g. for update/remove), exercise_id
+            (the exercise library id, e.g. for add_workout_exercise), name, category,
+            order_position, target_sets, target_reps, target_weight, target_duration,
+            superset_group_id.
         """
         auth = get_current_auth()
 
@@ -71,7 +73,7 @@ def register_template_tools(mcp, conn: sqlite3.Connection) -> None:
         result = dict(row)
 
         exercises = conn.execute(
-            """SELECT we.id, e.name, c.name AS category, we.order_position,
+            """SELECT we.id, we.exercise_id, e.name, c.name AS category, we.order_position,
                       we.target_sets, we.target_reps, we.target_weight, we.target_duration,
                       we.superset_group_id
                FROM workout_exercises we
@@ -122,7 +124,7 @@ def register_template_tools(mcp, conn: sqlite3.Connection) -> None:
 
         template_exercises = conn.execute(
             """SELECT exercise_id, order_position, target_sets, target_reps,
-                      target_weight, target_duration, superset_group_id
+                      target_weight, target_duration, superset_group_id, notes
                FROM workout_exercises WHERE workout_id = ?
                ORDER BY order_position""",
             (template_id,),
@@ -132,12 +134,13 @@ def register_template_tools(mcp, conn: sqlite3.Connection) -> None:
             conn.execute(
                 """INSERT INTO workout_exercises
                    (workout_id, exercise_id, order_position, target_sets, target_reps,
-                    target_weight, target_duration, superset_group_id, created_at, updated_at)
-                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                    target_weight, target_duration, superset_group_id, notes,
+                    created_at, updated_at)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
                 (
                     workout_id, ex["exercise_id"], ex["order_position"],
                     ex["target_sets"], ex["target_reps"], ex["target_weight"],
-                    ex["target_duration"], ex["superset_group_id"], now, now,
+                    ex["target_duration"], ex["superset_group_id"], ex["notes"], now, now,
                 ),
             )
 

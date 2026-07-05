@@ -70,9 +70,11 @@ def register_workout_tools(mcp, conn: sqlite3.Connection) -> None:
 
         Returns:
             Dict with workout fields plus an 'exercises' list. Each exercise has:
-            id, name, category, order_position, target_sets, target_reps,
-            target_weight, target_duration, actual_sets, actual_reps,
-            actual_weight, actual_duration, notes, superset_group_id.
+            id (the workout_exercises row id, e.g. for log_exercise / update / remove),
+            exercise_id (the exercise library id, e.g. for add_workout_exercise), name,
+            category, order_position, target_sets, target_reps, target_weight,
+            target_duration, actual_sets, actual_reps, actual_weight, actual_duration,
+            notes, superset_group_id.
         """
         auth = get_current_auth()
 
@@ -90,7 +92,7 @@ def register_workout_tools(mcp, conn: sqlite3.Connection) -> None:
         result = dict(row)
 
         exercises = conn.execute(
-            """SELECT we.id, e.name, c.name AS category, we.order_position,
+            """SELECT we.id, we.exercise_id, e.name, c.name AS category, we.order_position,
                       we.target_sets, we.target_reps, we.target_weight, we.target_duration,
                       we.actual_sets, we.actual_reps, we.actual_weight, we.actual_duration,
                       we.notes, we.superset_group_id
@@ -405,3 +407,32 @@ def register_workout_tools(mcp, conn: sqlite3.Connection) -> None:
         )
         conn.commit()
         return {"workout_id": workout_id, "status": "completed"}
+
+    @mcp.tool()
+    def delete_workout(workout_id: int) -> dict:
+        """Delete a workout and all of its exercise entries.
+
+        Only the owner may delete, and only workouts (not templates) — use
+        delete_template to remove a template.
+
+        Args:
+            workout_id: The workout ID.
+
+        Returns:
+            Dict with {deleted: true} on success.
+        """
+        auth = get_current_auth()
+        if not auth.can_write():
+            raise PermissionError("readwrite scope required")
+
+        row = conn.execute(
+            "SELECT id FROM workouts WHERE id = ? AND user_id = ? AND is_template = 0",
+            (workout_id, auth.user_id),
+        ).fetchone()
+        if not row:
+            raise ValueError(f"Workout {workout_id} not found")
+
+        conn.execute("DELETE FROM workout_exercises WHERE workout_id = ?", (workout_id,))
+        conn.execute("DELETE FROM workouts WHERE id = ?", (workout_id,))
+        conn.commit()
+        return {"deleted": True}
