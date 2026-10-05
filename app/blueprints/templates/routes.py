@@ -1,8 +1,16 @@
-from flask import render_template, redirect, url_for, flash, request, abort, jsonify
+from flask import render_template, redirect, url_for, flash, request, abort
 from flask_login import login_required, current_user
 from datetime import datetime, date, timedelta
-from app.models import Workout, WorkoutExercise, Exercise
+from app.models import Workout, Exercise
 from app.blueprints.templates import templates_bp
+
+
+def _owned_template(template_id):
+    """The current user's template, or 404."""
+    template = Workout.get_by_id(template_id)
+    if not template or template.user_id != current_user.id or not template.is_template:
+        abort(404)
+    return template
 
 
 @templates_bp.route('/')
@@ -29,9 +37,13 @@ def list():
 def create():
     """Create a new template"""
     if request.method == 'POST':
-        name = request.form.get('name')
-        notes = request.form.get('notes')
+        name = request.form.get('name', '').strip()
+        notes = request.form.get('notes', '').strip() or None
         is_public = 1 if request.form.get('is_public') else 0
+
+        if not name:
+            flash('Please give the template a name.', 'danger')
+            return render_template('templates/create.html')
 
         template = Workout.create_template(
             user_id=current_user.id,
@@ -73,68 +85,27 @@ def detail(template_id):
                           exercises=exercises)
 
 
-@templates_bp.route('/<int:template_id>/edit', methods=['GET', 'POST'])
+@templates_bp.route('/<int:template_id>/edit')
 @login_required
 def edit(template_id):
-    """Edit template exercises"""
-    template = Workout.get_by_id(template_id)
-
-    # Verify ownership
-    if template.user_id != current_user.id or not template.is_template:
-        flash('Access denied', 'danger')
-        return redirect(url_for('templates.list'))
-
-    exercises = template.get_exercises()
-
-    # Get all available exercises for the dropdown
-    all_exercises = Exercise.get_all(limit=2100)  # Get all exercises
-
-    # Get filter options
-    categories = Exercise.get_all_categories()
-    muscles = Exercise.get_all_muscles()
-    equipment_list = Exercise.get_all_equipment()
+    """Edit template details and exercises"""
+    template = _owned_template(template_id)
 
     return render_template('templates/edit.html',
                           workout=template,
-                          exercises=exercises,
-                          all_exercises=all_exercises,
-                          categories=categories,
-                          muscles=muscles,
-                          equipment_list=equipment_list)
-
-
-@templates_bp.route('/<int:template_id>/update-notes', methods=['POST'])
-@login_required
-def update_notes(template_id):
-    """Update template notes"""
-    template = Workout.get_by_id(template_id)
-
-    if not template or template.user_id != current_user.id or not template.is_template:
-        abort(404)
-
-    notes = request.form.get('notes', '').strip()
-
-    # Update template notes (can be empty)
-    template.update(notes=notes if notes else None)
-
-    flash('Template notes updated successfully', 'success')
-    return redirect(url_for('templates.edit', template_id=template_id))
+                          exercises=template.get_exercises(),
+                          categories=Exercise.get_all_categories(),
+                          muscles=Exercise.get_all_muscles())
 
 
 @templates_bp.route('/<int:template_id>/delete', methods=['POST'])
 @login_required
 def delete(template_id):
     """Delete a template"""
-    template = Workout.get_by_id(template_id)
-
-    if template.user_id != current_user.id:
-        flash('Access denied', 'danger')
-        return redirect(url_for('templates.list'))
-
-    template_name = template.name
+    template = _owned_template(template_id)
     template.delete()
 
-    flash(f'Template "{template_name}" deleted', 'success')
+    flash(f'Template "{template.name}" deleted', 'success')
     return redirect(url_for('templates.list'))
 
 
@@ -166,8 +137,11 @@ def use_template(template_id):
         # Use form notes if provided, otherwise fall back to template notes
         notes = form_notes if form_notes else template.notes
 
-        # Parse date
-        parsed_date = datetime.strptime(scheduled_date, '%Y-%m-%d').date()
+        try:
+            parsed_date = datetime.strptime(scheduled_date or '', '%Y-%m-%d').date()
+        except ValueError:
+            flash('Please choose a valid date.', 'danger')
+            return redirect(url_for('templates.use_template', template_id=template_id))
 
         # Calculate times if both scheduled_time and duration are provided
         started_at = None
@@ -217,10 +191,7 @@ def browse_public():
 @login_required
 def toggle_privacy(template_id):
     """Toggle template privacy (public/private)"""
-    template = Workout.get_by_id(template_id)
-
-    if not template or template.user_id != current_user.id or not template.is_template:
-        abort(404)
+    template = _owned_template(template_id)
 
     try:
         new_status = template.toggle_public()
@@ -229,53 +200,5 @@ def toggle_privacy(template_id):
     except ValueError as e:
         flash(str(e), 'danger')
 
-    return redirect(request.referrer or url_for('templates.detail', template_id=template_id))
-
-
-# ===== SUPERSET ROUTES =====
-
-@templates_bp.route('/<int:template_id>/superset/create', methods=['POST'])
-@login_required
-def create_superset(template_id):
-    """Create a superset from selected exercises (AJAX endpoint)"""
-    template = Workout.get_by_id(template_id)
-
-    if not template or template.user_id != current_user.id or not template.is_template:
-        return jsonify({'error': 'Unauthorized'}), 403
-
-    exercise_ids = request.form.getlist('exercise_ids[]', type=int)
-
-    if len(exercise_ids) < 2:
-        return jsonify({'error': 'Select at least 2 exercises'}), 400
-
-    try:
-        group_id = WorkoutExercise.create_superset(exercise_ids)
-        return jsonify({'success': True, 'superset_group_id': group_id})
-    except ValueError as e:
-        return jsonify({'error': str(e)}), 400
-
-
-@templates_bp.route('/<int:template_id>/superset/<int:group_id>/dissolve', methods=['POST'])
-@login_required
-def dissolve_superset(template_id, group_id):
-    """Dissolve a superset entirely (AJAX endpoint)"""
-    template = Workout.get_by_id(template_id)
-
-    if not template or template.user_id != current_user.id or not template.is_template:
-        return jsonify({'error': 'Unauthorized'}), 403
-
-    WorkoutExercise.dissolve_superset(template_id, group_id)
-    return jsonify({'success': True})
-
-
-@templates_bp.route('/<int:template_id>/exercises/<int:workout_exercise_id>/remove-from-superset', methods=['POST'])
-@login_required
-def remove_from_superset(template_id, workout_exercise_id):
-    """Remove exercise from its superset (AJAX endpoint)"""
-    template = Workout.get_by_id(template_id)
-
-    if not template or template.user_id != current_user.id or not template.is_template:
-        return jsonify({'error': 'Unauthorized'}), 403
-
-    WorkoutExercise.remove_from_superset(workout_exercise_id)
-    return jsonify({'success': True})
+    endpoint = 'templates.edit' if request.form.get('from') == 'edit' else 'templates.detail'
+    return redirect(url_for(endpoint, template_id=template_id))

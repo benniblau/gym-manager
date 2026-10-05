@@ -1,4 +1,4 @@
-from flask import Blueprint, render_template, request, jsonify
+from flask import Blueprint, render_template, request, jsonify, abort
 from flask_login import login_required
 import math
 
@@ -21,22 +21,10 @@ def browse():
     equipment = request.args.get('equipment')
     search_query = request.args.get('q')
 
-    # Get exercises based on filters
-    if search_query:
-        exercises = Exercise.search(search_query, limit=per_page, offset=offset)
-        total_count = Exercise.count_search(search_query)
-    elif category or muscle or equipment:
-        exercises = Exercise.filter(
-            category=category,
-            muscle=muscle,
-            equipment=equipment,
-            limit=per_page,
-            offset=offset
-        )
-        total_count = Exercise.count_filter(category=category, muscle=muscle, equipment=equipment)
-    else:
-        exercises = Exercise.get_all(limit=per_page, offset=offset)
-        total_count = Exercise.count()
+    exercises, total_count = Exercise.find(
+        query=search_query, category=category, muscle=muscle, equipment=equipment,
+        limit=per_page, offset=offset
+    )
 
     total_pages = math.ceil(total_count / per_page)
 
@@ -65,7 +53,7 @@ def detail(exercise_id):
     exercise = Exercise.get_by_id(exercise_id)
 
     if not exercise:
-        return render_template('errors/404.html'), 404
+        abort(404)
 
     return render_template('exercises/detail.html', exercise=exercise)
 
@@ -101,35 +89,24 @@ def details_json(exercise_id):
     })
 
 
-@exercises_bp.route('/search')
+@exercises_bp.route('/picker')
 @login_required
-def search():
-    """AJAX search endpoint"""
-    query = request.args.get('q', '')
-    limit = request.args.get('limit', 20, type=int)
+def picker():
+    """Paged search for the add-exercise sheet on the edit pages (AJAX)"""
+    limit = 30
+    offset = max(request.args.get('offset', 0, type=int), 0)
 
-    if not query:
-        return jsonify({'exercises': []})
-
-    exercises = Exercise.search(query, limit=limit)
-
-    return jsonify({'exercises': exercises})
-
-
-@exercises_bp.route('/filter')
-@login_required
-def filter():
-    """AJAX filter endpoint"""
-    category = request.args.get('category')
-    muscle = request.args.get('muscle')
-    equipment = request.args.get('equipment')
-    limit = request.args.get('limit', 20, type=int)
-
-    exercises = Exercise.filter(
-        category=category,
-        muscle=muscle,
-        equipment=equipment,
-        limit=limit
+    exercises, total = Exercise.find(
+        query=request.args.get('q', '').strip() or None,
+        category=request.args.get('category') or None,
+        muscle=request.args.get('muscle') or None,
+        limit=limit, offset=offset
     )
 
-    return jsonify({'exercises': exercises})
+    return jsonify({
+        'exercises': [
+            {k: e[k] for k in ('id', 'name', 'category_name', 'primary_muscles')} for e in exercises
+        ],
+        'total': total,
+        'next_offset': offset + limit if offset + limit < total else None,
+    })

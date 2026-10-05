@@ -106,6 +106,26 @@ Each migration is idempotent and supports `--dry-run`.
 python migrations/add_api_keys_table.py   # MCP API key storage
 ```
 
+Schema changes since then are versioned (tracked in the `schema_version` table) and applied by one runner. The app will not start while migrations are pending, so back up the database and run this after every upgrade:
+
+```bash
+python migrations/migrate.py --dry-run   # show what would change, then roll back
+python migrations/migrate.py
+```
+
+Optionally create small `.webp` copies of the exercise images (41 MB → 1.5 MB served; originals are kept and the app picks the `.webp` automatically). Requires `cwebp`:
+
+```bash
+python migrations/convert_images_to_webp.py
+```
+
+## Tests
+
+```bash
+pip install -r requirements-dev.txt
+python -m pytest
+```
+
 ## MCP Server
 
 Gym Manager exposes a [Model Context Protocol](https://modelcontextprotocol.io) server so AI agents (Claude Code, Claude Desktop) can read and write your gym data directly.
@@ -148,9 +168,15 @@ Templates and workouts share the same underlying tables (a template is a workout
 
 The project includes systemd service files in `deploy/` and a Gunicorn config (`gunicorn_config.py`) for Linux deployments. The app uses `ProxyFix` middleware for deployments behind a reverse proxy (Traefik/nginx).
 
+`SECRET_KEY` must be set in `.env`; the app refuses to start in production without it.
+
 ```bash
 # Run the migration to add the api_keys table
 python migrations/add_api_keys_table.py
+
+# Back up, then bring the schema up to date
+sqlite3 exercises.db ".backup 'backup/pre_upgrade.db'"
+python migrations/migrate.py
 
 # Copy and enable both service files
 sudo cp deploy/gym-manager.service /etc/systemd/system/

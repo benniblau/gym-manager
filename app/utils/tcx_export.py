@@ -4,6 +4,8 @@ from xml.etree.ElementTree import Element, SubElement, tostring
 from xml.dom import minidom
 
 from app.blueprints.strava.utils import calculate_elapsed_time
+from gymcore.db import parse_dt
+from gymcore.sets import describe_plan
 
 
 def generate_tcx_xml(workout, exercises):
@@ -17,16 +19,7 @@ def generate_tcx_xml(workout, exercises):
     Returns:
         str: Formatted TCX XML string
     """
-    # Parse workout times
-    if isinstance(workout.started_at, str):
-        start_time = datetime.fromisoformat(workout.started_at)
-    else:
-        start_time = workout.started_at
-
-    if isinstance(workout.completed_at, str):
-        end_time = datetime.fromisoformat(workout.completed_at)
-    else:
-        end_time = workout.completed_at
+    start_time = parse_dt(workout.started_at)
 
     # Calculate duration using shared helper (respects duration_minutes if set)
     duration_seconds = calculate_elapsed_time(workout)
@@ -104,15 +97,10 @@ def generate_tcx_xml(workout, exercises):
     # Add exercises list
     notes_lines.append('Exercises:')
     for exercise in exercises:
-        sets = exercise.get('actual_sets') or exercise.get('target_sets')
-        reps = exercise.get('actual_reps') or exercise.get('target_reps')
-        weight = exercise.get('actual_weight') or exercise.get('target_weight')
-
         exercise_line = f"• {exercise['exercise_name']}"
-        if sets and reps:
-            exercise_line += f" - {sets}x{reps}"
-        if weight:
-            exercise_line += f" @ {weight}kg"
+        details = exercise.get('sets_text') or describe_plan(exercise)
+        if details:
+            exercise_line += f" - {details}"
         notes_lines.append(exercise_line)
 
     notes.text = '\n'.join(notes_lines)

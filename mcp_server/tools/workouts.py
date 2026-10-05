@@ -2,10 +2,19 @@
 
 import json
 import sqlite3
-from datetime import datetime, timezone
 from typing import Optional
 
+from gymcore import sets as core_sets
+from gymcore import workouts as core
 from mcp_server.auth import get_current_auth
+
+
+def _writer():
+    """The current auth context, which must carry the readwrite scope."""
+    auth = get_current_auth()
+    if not auth.can_write():
+        raise PermissionError("readwrite scope required")
+    return auth
 
 
 def register_workout_tools(mcp, conn: sqlite3.Connection) -> None:
@@ -73,8 +82,9 @@ def register_workout_tools(mcp, conn: sqlite3.Connection) -> None:
             id (the workout_exercises row id, e.g. for log_exercise / update / remove),
             exercise_id (the exercise library id, e.g. for add_workout_exercise), name,
             category, order_position, target_sets, target_reps, target_weight,
-            target_duration, actual_sets, actual_reps, actual_weight, actual_duration,
-            notes, superset_group_id.
+            target_duration, actual_sets, actual_reps, actual_weight, actual_duration
+            (a summary of the logged sets), notes, superset_group_id, and sets: the
+            individual logged sets as {set_number, reps, weight, duration, logged_at}.
         """
         auth = get_current_auth()
 
@@ -104,6 +114,9 @@ def register_workout_tools(mcp, conn: sqlite3.Connection) -> None:
             (workout_id,),
         ).fetchall()
         result["exercises"] = [dict(e) for e in exercises]
+        by_entry = core_sets.sets_for(conn, [e["id"] for e in result["exercises"]])
+        for entry in result["exercises"]:
+            entry["sets"] = by_entry[entry["id"]]
 
         return result
 
@@ -123,19 +136,10 @@ def register_workout_tools(mcp, conn: sqlite3.Connection) -> None:
         Returns:
             Dict with {workout_id}.
         """
-        auth = get_current_auth()
-        if not auth.can_write():
-            raise PermissionError("readwrite scope required")
-
-        now = datetime.now(timezone.utc).isoformat()
-        cursor = conn.execute(
-            """INSERT INTO workouts (user_id, name, status, scheduled_date, notes,
-                                    is_template, created_at, updated_at)
-               VALUES (?, ?, 'planned', ?, ?, 0, ?, ?)""",
-            (auth.user_id, name, scheduled_date, notes, now, now),
-        )
-        conn.commit()
-        return {"workout_id": cursor.lastrowid}
+        auth = _writer()
+        with conn:
+            workout_id = core.create_workout(conn, auth.user_id, name, scheduled_date, notes=notes)
+        return {"workout_id": workout_id}
 
     @mcp.tool()
     def log_exercise(
@@ -145,59 +149,85 @@ def register_workout_tools(mcp, conn: sqlite3.Connection) -> None:
         actual_weight: Optional[float] = None,
         actual_duration: Optional[int] = None,
     ) -> dict:
-        """Log actual values for an exercise in a workout.
+        """Log an exercise as a number of identical sets (replaces any sets already logged).
+
+        Use this when every set was the same. For sets that differ (e.g. rising
+        weight), call log_set once per set instead. Omitted values keep what was
+        previously logged for this exercise.
 
         Args:
             workout_exercise_id: The workout_exercises row ID.
             actual_sets: Number of sets completed.
-            actual_reps: Number of reps completed.
-            actual_weight: Weight used (kg or lb, same unit as targets).
-            actual_duration: Duration in seconds.
+            actual_reps: Reps per set.
+            actual_weight: Weight used in kg.
+            actual_duration: Duration per set in seconds.
 
         Returns:
-            Dict with {updated: true} on success.
+            Dict with {updated: true, sets: <number of sets now logged>}.
         """
-        auth = get_current_auth()
-        if not auth.can_write():
-            raise PermissionError("readwrite scope required")
+        auth = _writer()
+        entry = core.owned_entry(conn, auth.user_id, workout_exercise_id, is_template=False)
 
-        row = conn.execute(
-            """SELECT we.id FROM workout_exercises we
-               JOIN workouts w ON w.id = we.workout_id
-               WHERE we.id = ? AND w.user_id = ? AND w.is_template = 0""",
-            (workout_exercise_id, auth.user_id),
-        ).fetchone()
-        if not row:
-            raise ValueError(f"WorkoutExercise {workout_exercise_id} not found")
-
-        updates = []
-        params = []
-        if actual_sets is not None:
-            updates.append("actual_sets = ?")
-            params.append(actual_sets)
-        if actual_reps is not None:
-            updates.append("actual_reps = ?")
-            params.append(actual_reps)
-        if actual_weight is not None:
-            updates.append("actual_weight = ?")
-            params.append(actual_weight)
-        if actual_duration is not None:
-            updates.append("actual_duration = ?")
-            params.append(actual_duration)
-
-        if not updates:
+        if all(v is None for v in (actual_sets, actual_reps, actual_weight, actual_duration)):
             raise ValueError("No values provided to log")
 
-        updates.append("updated_at = ?")
-        params.append(datetime.now(timezone.utc).isoformat())
-        params.append(workout_exercise_id)
+        def pick(value, column):
+            return value if value is not None else entry[column]
 
-        conn.execute(
-            f"UPDATE workout_exercises SET {', '.join(updates)} WHERE id = ?",
-            params,
-        )
-        conn.commit()
+        count = pick(actual_sets, "actual_sets") or 1
+        with conn:
+            core_sets.replace_sets(
+                conn, workout_exercise_id, count,
+                reps=pick(actual_reps, "actual_reps"),
+                weight=pick(actual_weight, "actual_weight"),
+                duration=pick(actual_duration, "actual_duration"),
+            )
+            core.start_workout(conn, entry["workout_id"])
+        return {"updated": True, "sets": count}
+
+    @mcp.tool()
+    def log_set(
+        workout_exercise_id: int,
+        set_number: int,
+        reps: Optional[int] = None,
+        weight: Optional[float] = None,
+        duration: Optional[int] = None,
+    ) -> dict:
+        """Log one performed set of an exercise (creates or overwrites that set number).
+
+        Args:
+            workout_exercise_id: The workout_exercises row ID.
+            set_number: 1-based number of the set within the exercise.
+            reps: Reps performed.
+            weight: Weight used in kg.
+            duration: Duration in seconds (time-based exercises).
+
+        Returns:
+            Dict with {updated: true}.
+        """
+        auth = _writer()
+        entry = core.owned_entry(conn, auth.user_id, workout_exercise_id, is_template=False)
+        with conn:
+            core_sets.log_set(conn, workout_exercise_id, set_number, reps, weight, duration)
+            core.start_workout(conn, entry["workout_id"])
         return {"updated": True}
+
+    @mcp.tool()
+    def remove_set(workout_exercise_id: int, set_number: int) -> dict:
+        """Remove one logged set of an exercise.
+
+        Args:
+            workout_exercise_id: The workout_exercises row ID.
+            set_number: The set number to remove.
+
+        Returns:
+            Dict with {deleted: true}.
+        """
+        auth = _writer()
+        core.owned_entry(conn, auth.user_id, workout_exercise_id, is_template=False)
+        with conn:
+            core_sets.clear_set(conn, workout_exercise_id, set_number)
+        return {"deleted": True}
 
     @mcp.tool()
     def add_workout_exercise(
@@ -220,10 +250,10 @@ def register_workout_tools(mcp, conn: sqlite3.Connection) -> None:
         Args:
             workout_id: The workout OR template ID to add the exercise to.
             exercise_id: The exercise library ID (from search_exercises / get_exercise).
-            order_position: 0-based position; omit to append after the last exercise.
+            order_position: Position to insert at; omit to append after the last exercise.
             target_sets: Planned number of sets.
             target_reps: Planned reps per set.
-            target_weight: Planned weight (kg or lb).
+            target_weight: Planned weight in kg.
             target_duration: Planned duration in seconds.
             superset_group_id: Group ID to link this exercise into a superset.
             notes: Optional per-exercise note.
@@ -231,44 +261,18 @@ def register_workout_tools(mcp, conn: sqlite3.Connection) -> None:
         Returns:
             Dict with {workout_exercise_id, order_position}.
         """
-        auth = get_current_auth()
-        if not auth.can_write():
-            raise PermissionError("readwrite scope required")
-
-        parent = conn.execute(
-            "SELECT id FROM workouts WHERE id = ? AND user_id = ?",
-            (workout_id, auth.user_id),
-        ).fetchone()
-        if not parent:
-            raise ValueError(f"Workout {workout_id} not found")
-
-        exists = conn.execute(
-            "SELECT id FROM exercises WHERE id = ?", (exercise_id,)
-        ).fetchone()
-        if not exists:
-            raise ValueError(f"Exercise {exercise_id} not found")
-
-        if order_position is None:
-            order_position = conn.execute(
-                """SELECT COALESCE(MAX(order_position), -1) + 1 AS next
-                   FROM workout_exercises WHERE workout_id = ?""",
-                (workout_id,),
-            ).fetchone()["next"]
-
-        now = datetime.now(timezone.utc).isoformat()
-        cursor = conn.execute(
-            """INSERT INTO workout_exercises
-               (workout_id, exercise_id, order_position, target_sets, target_reps,
-                target_weight, target_duration, superset_group_id, notes,
-                created_at, updated_at)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-            (
-                workout_id, exercise_id, order_position, target_sets, target_reps,
-                target_weight, target_duration, superset_group_id, notes, now, now,
-            ),
-        )
-        conn.commit()
-        return {"workout_exercise_id": cursor.lastrowid, "order_position": order_position}
+        auth = _writer()
+        core.owned_workout(conn, auth.user_id, workout_id)
+        with conn:
+            entry_id = core.add_entry(
+                conn, workout_id, exercise_id, order_position=order_position,
+                target_sets=target_sets, target_reps=target_reps, target_weight=target_weight,
+                target_duration=target_duration, superset_group_id=superset_group_id, notes=notes,
+            )
+        position = conn.execute(
+            "SELECT order_position FROM workout_exercises WHERE id = ?", (entry_id,)
+        ).fetchone()["order_position"]
+        return {"workout_exercise_id": entry_id, "order_position": position}
 
     @mcp.tool()
     def update_workout_exercise(
@@ -284,12 +288,12 @@ def register_workout_tools(mcp, conn: sqlite3.Connection) -> None:
         """Update an exercise entry's planned targets, order, or superset grouping.
 
         Works for entries in both workouts and templates. Only the owner may
-        update. To log what was actually performed, use log_exercise instead.
+        update. To log what was actually performed, use log_set or log_exercise.
         Omitted fields are left unchanged.
 
         Args:
             workout_exercise_id: The workout_exercises row ID.
-            order_position: New 0-based position.
+            order_position: New position.
             target_sets: New planned sets.
             target_reps: New planned reps.
             target_weight: New planned weight.
@@ -300,18 +304,8 @@ def register_workout_tools(mcp, conn: sqlite3.Connection) -> None:
         Returns:
             Dict with {updated: true} on success.
         """
-        auth = get_current_auth()
-        if not auth.can_write():
-            raise PermissionError("readwrite scope required")
-
-        row = conn.execute(
-            """SELECT we.id FROM workout_exercises we
-               JOIN workouts w ON w.id = we.workout_id
-               WHERE we.id = ? AND w.user_id = ?""",
-            (workout_exercise_id, auth.user_id),
-        ).fetchone()
-        if not row:
-            raise ValueError(f"WorkoutExercise {workout_exercise_id} not found")
+        auth = _writer()
+        core.owned_entry(conn, auth.user_id, workout_exercise_id)
 
         fields = {
             "order_position": order_position,
@@ -322,23 +316,12 @@ def register_workout_tools(mcp, conn: sqlite3.Connection) -> None:
             "superset_group_id": superset_group_id,
             "notes": notes,
         }
-        updates, params = [], []
-        for col, val in fields.items():
-            if val is not None:
-                updates.append(f"{col} = ?")
-                params.append(val)
-        if not updates:
+        fields = {name: value for name, value in fields.items() if value is not None}
+        if not fields:
             raise ValueError("No fields provided to update")
 
-        updates.append("updated_at = ?")
-        params.append(datetime.now(timezone.utc).isoformat())
-        params.append(workout_exercise_id)
-
-        conn.execute(
-            f"UPDATE workout_exercises SET {', '.join(updates)} WHERE id = ?",
-            params,
-        )
-        conn.commit()
+        with conn:
+            core.update_entry(conn, workout_exercise_id, **fields)
         return {"updated": True}
 
     @mcp.tool()
@@ -353,23 +336,10 @@ def register_workout_tools(mcp, conn: sqlite3.Connection) -> None:
         Returns:
             Dict with {deleted: true} on success.
         """
-        auth = get_current_auth()
-        if not auth.can_write():
-            raise PermissionError("readwrite scope required")
-
-        row = conn.execute(
-            """SELECT we.id FROM workout_exercises we
-               JOIN workouts w ON w.id = we.workout_id
-               WHERE we.id = ? AND w.user_id = ?""",
-            (workout_exercise_id, auth.user_id),
-        ).fetchone()
-        if not row:
-            raise ValueError(f"WorkoutExercise {workout_exercise_id} not found")
-
-        conn.execute(
-            "DELETE FROM workout_exercises WHERE id = ?", (workout_exercise_id,)
-        )
-        conn.commit()
+        auth = _writer()
+        core.owned_entry(conn, auth.user_id, workout_exercise_id)
+        with conn:
+            core.remove_entry(conn, workout_exercise_id)
         return {"deleted": True}
 
     @mcp.tool()
@@ -379,6 +349,9 @@ def register_workout_tools(mcp, conn: sqlite3.Connection) -> None:
     ) -> dict:
         """Mark a workout as completed.
 
+        Start time, end time and duration are filled in where missing; values
+        that are already set are kept.
+
         Args:
             workout_id: The workout ID.
             duration_minutes: Optional total duration in minutes.
@@ -386,26 +359,10 @@ def register_workout_tools(mcp, conn: sqlite3.Connection) -> None:
         Returns:
             Dict with {workout_id, status: 'completed'}.
         """
-        auth = get_current_auth()
-        if not auth.can_write():
-            raise PermissionError("readwrite scope required")
-
-        row = conn.execute(
-            "SELECT id FROM workouts WHERE id = ? AND user_id = ? AND is_template = 0",
-            (workout_id, auth.user_id),
-        ).fetchone()
-        if not row:
-            raise ValueError(f"Workout {workout_id} not found")
-
-        now = datetime.now(timezone.utc).isoformat()
-        conn.execute(
-            """UPDATE workouts
-               SET status = 'completed', completed_at = ?, duration_minutes = ?,
-                   updated_at = ?
-               WHERE id = ?""",
-            (now, duration_minutes, now, workout_id),
-        )
-        conn.commit()
+        auth = _writer()
+        core.owned_workout(conn, auth.user_id, workout_id, is_template=False)
+        with conn:
+            core.complete_workout(conn, workout_id, duration_minutes)
         return {"workout_id": workout_id, "status": "completed"}
 
     @mcp.tool()
@@ -421,18 +378,8 @@ def register_workout_tools(mcp, conn: sqlite3.Connection) -> None:
         Returns:
             Dict with {deleted: true} on success.
         """
-        auth = get_current_auth()
-        if not auth.can_write():
-            raise PermissionError("readwrite scope required")
-
-        row = conn.execute(
-            "SELECT id FROM workouts WHERE id = ? AND user_id = ? AND is_template = 0",
-            (workout_id, auth.user_id),
-        ).fetchone()
-        if not row:
-            raise ValueError(f"Workout {workout_id} not found")
-
-        conn.execute("DELETE FROM workout_exercises WHERE workout_id = ?", (workout_id,))
-        conn.execute("DELETE FROM workouts WHERE id = ?", (workout_id,))
-        conn.commit()
+        auth = _writer()
+        core.owned_workout(conn, auth.user_id, workout_id, is_template=False)
+        with conn:
+            core.delete_workout(conn, workout_id)
         return {"deleted": True}

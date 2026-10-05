@@ -61,9 +61,10 @@
                                                 </button>
                                             </td>
                                             <td>
-                                                <form method="POST" action="{{ url_for('auth.revoke_invite', invitation_id=invitation.id) }}" style="display: inline;">
-                                                    <button type="submit" class="btn btn-sm btn-danger btn-touch"
-                                                            onclick="return confirm('Are you sure you want to revoke this invitation?')">
+                                                <form method="POST" action="{{ url_for('auth.revoke_invite', invitation_id=invitation.id) }}" style="display: inline;"
+                                                      data-confirm="Revoke this invitation?" data-confirm-ok="Revoke" data-confirm-danger>
+                                                    {{ csrf_field() }}
+                                                    <button type="submit" class="btn btn-sm btn-outline-danger btn-touch">
                                                         <i class="fa-solid fa-ban"></i> Revoke
                                                     </button>
                                                 </form>
@@ -150,7 +151,7 @@ document.querySelectorAll('.copy-link').forEach(btn => {
                 this.classList.add('btn-outline-primary');
             }, 2000);
         }).catch(err => {
-            alert('Failed to copy link. Please copy manually: ' + link);
+            gm.toast('Could not copy. Link: ' + link, 'danger');
         });
     });
 });

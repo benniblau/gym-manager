@@ -56,7 +56,8 @@
                             <label class="form-label fw-bold">Connected Since</label>
                             <input type="text" class="form-control" value="{{ strava_connection['connected_at'][:10] if strava_connection['connected_at'] else 'N/A' }}" disabled>
                         </div>
-                        <form method="POST" action="{{ url_for('strava.disconnect') }}" onsubmit="return confirm('Are you sure you want to disconnect Strava? You will need to reconnect to upload workouts.')">
+                        <form method="POST" action="{{ url_for('strava.disconnect') }}" data-confirm="Disconnect Strava? You will need to reconnect to upload workouts." data-confirm-ok="Disconnect" data-confirm-danger>
+                            {{ csrf_field() }}
                             <button type="submit" class="btn btn-danger btn-lg btn-touch w-100">
                                 <i class="fa-solid fa-circle-xmark"></i> Disconnect Strava
                             </button>
@@ -206,7 +207,7 @@
                 <div class="row">
                     <div class="col-md-6 mb-3">
                         {{ strava_form.access_token.label(class="form-label") }}
-                        {{ strava_form.access_token(class="form-control" + (" is-invalid" if strava_form.access_token.errors else ""), placeholder="Enter Strava access token") }}
+                        {{ strava_form.access_token(class="form-control" + (" is-invalid" if strava_form.access_token.errors else ""), placeholder="Stored tokens are never shown; enter new ones to replace them", autocomplete="off") }}
                         {% if strava_form.access_token.errors %}
                             <div class="invalid-feedback">
                                 {% for error in strava_form.access_token.errors %}
@@ -217,7 +218,7 @@
                     </div>
                     <div class="col-md-6 mb-3">
                         {{ strava_form.refresh_token.label(class="form-label") }}
-                        {{ strava_form.refresh_token(class="form-control" + (" is-invalid" if strava_form.refresh_token.errors else ""), placeholder="Enter Strava refresh token") }}
+                        {{ strava_form.refresh_token(class="form-control" + (" is-invalid" if strava_form.refresh_token.errors else ""), placeholder="Enter new refresh token", autocomplete="off") }}
                         {% if strava_form.refresh_token.errors %}
                             <div class="invalid-feedback">
                                 {% for error in strava_form.refresh_token.errors %}
@@ -321,7 +322,8 @@
                             <td class="text-muted small">{{ key.created_at[:10] }}</td>
                             <td>
                                 <form method="POST" action="{{ url_for('auth.delete_api_key', key_id=key.id) }}"
-                                      onsubmit="return confirm('Revoke this API key? Any clients using it will stop working.')">
+                                      data-confirm="Revoke this API key? Any clients using it will stop working." data-confirm-ok="Revoke" data-confirm-danger>
+                                    {{ csrf_field() }}
                                     <button type="submit" class="btn btn-sm btn-outline-danger">
                                         <i class="fa-solid fa-trash"></i> Revoke
                                     </button>
@@ -337,6 +339,7 @@
             {% endif %}
 
             <form method="POST" action="{{ url_for('auth.create_api_key') }}" class="row g-2 align-items-end">
+                {{ csrf_field() }}
                 <div class="col-md-5">
                     <label class="form-label fw-bold mb-1">Label <span class="text-muted fw-normal">(optional)</span></label>
                     <input type="text" name="label" class="form-control" placeholder="e.g. Claude Code">

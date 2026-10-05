@@ -1,84 +1,41 @@
 {% extends "base.html" %}
 
-{% block title %}Use Template - {{ template.name }}{% endblock %}
+{% block title %}Use {{ template.name }} - Gym Manager{% endblock %}
 
 {% block content %}
 <div class="container">
-    <h1 class="mb-4">
-        <i class="fa-solid fa-calendar-plus"></i> Create Workout from Template
-    </h1>
-
-    <div class="card mb-4">
-        <div class="card-body">
-            <h5 class="card-title">
-                <i class="fa-solid fa-bookmark"></i> {{ template.name }}
-            </h5>
-            <p class="text-muted">
-                <i class="fa-solid fa-list-check"></i>
-                {{ template.get_exercises()|length }} exercises
-            </p>
-            {% if template.notes %}
-                <p class="small mb-0">{{ template.notes }}</p>
-            {% endif %}
-        </div>
+    <div class="page-header">
+        <h1>New workout from template</h1>
     </div>
+    <p class="text-muted">
+        <i class="fa-solid fa-bookmark"></i> {{ template.name }} · {{ template.get_exercises()|length }} exercises
+    </p>
 
-    <div class="card">
-        <div class="card-body">
-            <h5 class="card-title">Schedule Workout</h5>
-            <form method="POST">
-                <div class="mb-3">
-                    <label for="scheduled_date" class="form-label">Date *</label>
-                    <input type="date"
-                           class="form-control"
-                           id="scheduled_date"
-                           name="scheduled_date"
-                           value="{{ today }}"
-                           required>
-                </div>
-
-                <div class="mb-3">
-                    <label for="scheduled_time" class="form-label">Start Time *</label>
-                    <input type="time"
-                           class="form-control"
-                           id="scheduled_time"
-                           name="scheduled_time"
-                           required>
-                </div>
-
-                <div class="mb-3">
-                    <label for="duration_minutes" class="form-label">Duration (minutes) *</label>
-                    <input type="number"
-                           class="form-control"
-                           id="duration_minutes"
-                           name="duration_minutes"
-                           min="1"
-                           placeholder="e.g., 60"
-                           required>
-                    <div class="form-text">The end time will be calculated from start time + duration.</div>
-                </div>
-
-                <div class="mb-3">
-                    <label for="notes" class="form-label">Notes (optional)</label>
-                    <textarea class="form-control"
-                              id="notes"
-                              name="notes"
-                              rows="3"
-                              placeholder="Add any specific notes for this workout...">{{ template.notes if template.notes else '' }}</textarea>
-                </div>
-
-                <div class="alert alert-info">
-                    <i class="fa-solid fa-circle-info"></i> This will create a new workout with all exercises from the template. You can then modify it as needed.
-                </div>
-
-                <div class="d-grid gap-2">
-                    <button type="submit" class="btn btn-primary btn-lg btn-touch">
-                        <i class="fa-solid fa-circle-check"></i> Create Workout
-                    </button>
-                    <a href="{{ url_for('templates.list') }}" class="btn btn-secondary">Cancel</a>
-                </div>
-            </form>
+    <form method="POST">
+        {{ csrf_field() }}
+        <div class="row g-2 mb-3">
+            <div class="col-7">
+                <label for="scheduled_date" class="form-label">Date</label>
+                <input type="date" class="form-control form-control-lg" id="scheduled_date" name="scheduled_date" value="{{ today }}" required>
+            </div>
+            <div class="col-5">
+                <label for="scheduled_time" class="form-label">Time <span class="text-muted fw-normal">(optional)</span></label>
+                <input type="time" class="form-control form-control-lg" id="scheduled_time" name="scheduled_time">
+            </div>
         </div>
-    </div>
+
+        <div class="mb-3">
+            <label for="notes" class="form-label">Notes <span class="text-muted fw-normal">(optional)</span></label>
+            <textarea class="form-control" id="notes" name="notes" rows="2">{{ template.notes or '' }}</textarea>
+        </div>
+
+        <div class="d-grid gap-2">
+            <button type="submit" class="btn btn-primary btn-lg btn-touch">
+                <i class="fa-solid fa-check"></i> Create workout
+            </button>
+            <a href="{{ url_for('templates.detail', template_id=template.id) }}" class="btn btn-outline-secondary btn-touch">Cancel</a>
+        </div>
+        <p class="form-text text-muted mt-2">Start and end times are recorded automatically when you log the workout.</p>
+    </form>
 </div>
 {% endblock %}

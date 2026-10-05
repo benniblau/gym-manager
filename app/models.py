@@ -1,14 +1,18 @@
+import os
 import sqlite3
 from flask import g, current_app
 from werkzeug.security import generate_password_hash, check_password_hash
 from datetime import datetime
 
+from gymcore import workouts as core
+from gymcore.db import connect, now
+from gymcore.sets import attach_sets
+
 
 def get_db():
     """Get database connection, reuse within request context"""
     if 'db' not in g:
-        g.db = sqlite3.connect(current_app.config['DATABASE_PATH'])
-        g.db.row_factory = sqlite3.Row  # Access columns by name
+        g.db = connect(current_app.config['DATABASE_PATH'])
     return g.db
 
 
@@ -91,7 +95,10 @@ class User:
         return User.get_by_id(cursor.lastrowid)
 
     def check_password(self, password):
-        """Verify password"""
+        """Verify password (also accepts bcrypt hashes written by older versions)"""
+        if self.password_hash.startswith('$2'):
+            from app import bcrypt
+            return bcrypt.check_password_hash(self.password_hash, password)
         return check_password_hash(self.password_hash, password)
 
     def update_last_login(self):
@@ -99,7 +106,7 @@ class User:
         db = get_db()
         db.execute(
             'UPDATE users SET last_login = ? WHERE id = ?',
-            (datetime.now(), self.id)
+            (now(), self.id)
         )
         db.commit()
 
@@ -115,8 +122,7 @@ class User:
 
     def update_password(self, new_password):
         """Update user password"""
-        from app import bcrypt
-        password_hash = bcrypt.generate_password_hash(new_password).decode('utf-8')
+        password_hash = generate_password_hash(new_password)
         db = get_db()
         db.execute(
             'UPDATE users SET password_hash = ? WHERE id = ?',
@@ -331,8 +337,9 @@ class Invitation:
                     setattr(self, key, value)
 
 
+
 class Workout:
-    """Workout model"""
+    """Workout model (templates are workouts with is_template=1)"""
 
     def __init__(self, id, user_id, name, scheduled_date, scheduled_time=None,
                  notes=None, status='planned', started_at=None, completed_at=None,
@@ -367,24 +374,35 @@ class Workout:
 
     @staticmethod
     def get_by_user(user_id, limit=50, offset=0):
-        """Get all workouts for a user"""
+        """Get a user's workouts (templates excluded), newest first"""
         db = get_db()
         rows = db.execute('''
             SELECT * FROM workouts
-            WHERE user_id = ?
-            ORDER BY scheduled_date DESC, scheduled_time DESC
+            WHERE user_id = ? AND is_template = 0
+            ORDER BY scheduled_date DESC, scheduled_time DESC, id DESC
             LIMIT ? OFFSET ?
         ''', (user_id, limit, offset)).fetchall()
         return [Workout(**dict(row)) for row in rows]
 
     @staticmethod
-    def get_recent_by_user(user_id, limit=10):
-        """Get recent workouts for a user"""
+    def count_by_user(user_id):
+        """Workout counts for a user (templates excluded): {'total', 'completed'}"""
+        db = get_db()
+        row = db.execute('''
+            SELECT COUNT(*) AS total,
+                   COALESCE(SUM(status = 'completed'), 0) AS completed
+            FROM workouts WHERE user_id = ? AND is_template = 0
+        ''', (user_id,)).fetchone()
+        return dict(row)
+
+    @staticmethod
+    def get_open_by_user(user_id, limit=5):
+        """Workouts still to do: in progress first, then planned by date"""
         db = get_db()
         rows = db.execute('''
             SELECT * FROM workouts
-            WHERE user_id = ?
-            ORDER BY scheduled_date DESC, scheduled_time DESC
+            WHERE user_id = ? AND is_template = 0 AND status != 'completed'
+            ORDER BY status = 'in_progress' DESC, scheduled_date, scheduled_time
             LIMIT ?
         ''', (user_id, limit)).fetchall()
         return [Workout(**dict(row)) for row in rows]
@@ -393,12 +411,11 @@ class Workout:
     def get_by_date(user_id, date):
         """Get workouts for a specific date"""
         db = get_db()
-        # Convert date to string for SQLite comparison
         if hasattr(date, 'isoformat'):
             date = date.isoformat()
         rows = db.execute('''
             SELECT * FROM workouts
-            WHERE user_id = ? AND scheduled_date = ?
+            WHERE user_id = ? AND is_template = 0 AND scheduled_date = ?
             ORDER BY scheduled_time
         ''', (user_id, date)).fetchall()
         return [Workout(**dict(row)) for row in rows]
@@ -407,78 +424,26 @@ class Workout:
     def create(user_id, name, scheduled_date, **kwargs):
         """Create new workout"""
         db = get_db()
-
-        # Convert date to string for SQLite
-        if hasattr(scheduled_date, 'isoformat'):
-            scheduled_date = scheduled_date.isoformat()
-
-        # Convert time to string for SQLite (if provided)
-        scheduled_time = kwargs.get('scheduled_time')
-        if scheduled_time and hasattr(scheduled_time, 'isoformat'):
-            scheduled_time = scheduled_time.isoformat()
-
-        # Convert started_at to string for SQLite (if provided)
-        started_at = kwargs.get('started_at')
-        if started_at and hasattr(started_at, 'isoformat'):
-            started_at = started_at.isoformat()
-
-        # Convert completed_at to string for SQLite (if provided)
-        completed_at = kwargs.get('completed_at')
-        if completed_at and hasattr(completed_at, 'isoformat'):
-            completed_at = completed_at.isoformat()
-
-        cursor = db.execute('''
-            INSERT INTO workouts (user_id, name, scheduled_date, scheduled_time, duration_minutes,
-                                 started_at, completed_at, notes, status, is_template)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        ''', (
-            user_id, name, scheduled_date,
-            scheduled_time,
-            kwargs.get('duration_minutes'),
-            started_at,
-            completed_at,
-            kwargs.get('notes'),
-            kwargs.get('status', 'planned'),
-            kwargs.get('is_template', 0)
-        ))
-        db.commit()
-        return Workout.get_by_id(cursor.lastrowid)
+        with db:
+            workout_id = core.create_workout(db, user_id, name, scheduled_date, **kwargs)
+        return Workout.get_by_id(workout_id)
 
     def update(self, **kwargs):
         """Update workout fields"""
         db = get_db()
-
-        # Build dynamic UPDATE query
-        fields = []
-        values = []
-
-        for key in ['name', 'scheduled_date', 'scheduled_time', 'notes', 'status', 'started_at', 'completed_at', 'duration_minutes']:
-            if key in kwargs:
-                value = kwargs[key]
-                # Convert date/time/datetime objects to strings for SQLite
-                if value and hasattr(value, 'isoformat'):
-                    value = value.isoformat()
-                fields.append(f'{key} = ?')
-                values.append(value)
-
-        if fields:
-            fields.append('updated_at = ?')
-            values.append(datetime.now().isoformat())
-            values.append(self.id)
-
-            query = f"UPDATE workouts SET {', '.join(fields)} WHERE id = ?"
-            db.execute(query, values)
-            db.commit()
+        with db:
+            core.update_workout(db, self.id, **kwargs)
 
     def delete(self):
-        """Delete workout"""
+        """Delete workout with its exercises and logged sets"""
         db = get_db()
-        db.execute('DELETE FROM workouts WHERE id = ?', (self.id,))
-        db.commit()
+        with db:
+            core.delete_workout(db, self.id)
 
     def get_exercises(self):
-        """Get all exercises in this workout"""
-        return WorkoutExercise.get_by_workout(self.id)
+        """Exercises in this workout, each with its logged 'sets'"""
+        db = get_db()
+        return attach_sets(db, core.list_entries(db, self.id))
 
     @staticmethod
     def get_templates_by_user(user_id, limit=50, offset=0):
@@ -496,86 +461,17 @@ class Workout:
     def create_template(user_id, name, notes=None, is_public=0):
         """Create a new workout template"""
         db = get_db()
-        cursor = db.execute('''
-            INSERT INTO workouts (user_id, name, scheduled_date, scheduled_time, notes, is_template, status, is_public, usage_count)
-            VALUES (?, ?, NULL, NULL, ?, 1, 'planned', ?, 0)
-        ''', (user_id, name, notes, is_public))
-        db.commit()
-        return Workout.get_by_id(cursor.lastrowid)
+        with db:
+            template_id = core.create_template(db, user_id, name, notes, is_public)
+        return Workout.get_by_id(template_id)
 
     @staticmethod
-    def create_from_template(template_id, user_id, scheduled_date, scheduled_time=None,
-                            duration_minutes=None, started_at=None, completed_at=None, notes=None):
-        """Create a new workout from a template"""
-        # Get template
-        template = Workout.get_by_id(template_id)
-
-        if not template:
-            raise ValueError("Template not found")
-
-        if not template.is_template:
-            raise ValueError("Workout is not a template")
-
-        # Verify ownership OR public access
-        if template.user_id != user_id and not template.is_public:
-            raise ValueError("Template is private and does not belong to user")
-
-        # Create new workout with template's name and provided parameters
-        workout = Workout.create(
-            user_id=user_id,
-            name=template.name,
-            scheduled_date=scheduled_date,
-            scheduled_time=scheduled_time,
-            duration_minutes=duration_minutes,
-            started_at=started_at,
-            completed_at=completed_at,
-            notes=notes  # Notes should be pre-set by caller (with template notes as fallback)
-        )
-
-        # Copy exercises from template (including superset groupings and reps)
-        template_exercises = template.get_exercises()
-        for ex in template_exercises:
-            WorkoutExercise.add_to_workout(
-                workout_id=workout.id,
-                exercise_id=ex['exercise_id'],
-                order_position=ex['order_position'],
-                target_sets=ex['target_sets'],
-                target_reps=ex['target_reps'],
-                target_weight=ex['target_weight'],
-                target_duration=ex['target_duration'],
-                notes=ex['notes'],
-                superset_group_id=ex.get('superset_group_id'),
-                superset_target_reps=ex.get('superset_target_reps')
-            )
-
-        # Increment usage count
-        template.increment_usage_count()
-
-        return workout
-
-    @staticmethod
-    def get_public_templates(order_by='usage_count', limit=50, offset=0):
-        """Get all public templates with creator information"""
+    def create_from_template(template_id, user_id, scheduled_date, **kwargs):
+        """Create a workout from the user's own or a public template"""
         db = get_db()
-
-        # Determine ORDER BY clause
-        order_clauses = {
-            'usage_count': 'w.usage_count DESC, w.name ASC',
-            'name': 'w.name ASC',
-            'created_at': 'w.created_at DESC'
-        }
-        order_clause = order_clauses.get(order_by, order_clauses['usage_count'])
-
-        rows = db.execute(f'''
-            SELECT w.*, u.username as creator_username
-            FROM workouts w
-            JOIN users u ON w.user_id = u.id
-            WHERE w.is_template = 1 AND w.is_public = 1
-            ORDER BY {order_clause}
-            LIMIT ? OFFSET ?
-        ''', (limit, offset)).fetchall()
-
-        return [dict(row) for row in rows]
+        with db:
+            workout_id = core.create_from_template(db, user_id, template_id, scheduled_date, **kwargs)
+        return Workout.get_by_id(workout_id)
 
     @staticmethod
     def get_all_templates(user_id, visibility='all', order_by='name', limit=100, offset=0):
@@ -588,7 +484,6 @@ class Workout:
         """
         db = get_db()
 
-        # Determine ORDER BY clause
         order_clauses = {
             'usage_count': 'w.usage_count DESC, w.name ASC',
             'name': 'w.name ASC',
@@ -596,7 +491,6 @@ class Workout:
         }
         order_clause = order_clauses.get(order_by, order_clauses['name'])
 
-        # Build WHERE clause based on visibility filter
         if visibility == 'mine':
             where_clause = 'w.is_template = 1 AND w.user_id = ?'
             params = [user_id]
@@ -611,7 +505,8 @@ class Workout:
 
         rows = db.execute(f'''
             SELECT w.*, u.username as creator_username,
-                   CASE WHEN w.user_id = ? THEN 1 ELSE 0 END as is_owner
+                   CASE WHEN w.user_id = ? THEN 1 ELSE 0 END as is_owner,
+                   (SELECT COUNT(*) FROM workout_exercises we WHERE we.workout_id = w.id) as exercise_count
             FROM workouts w
             JOIN users u ON w.user_id = u.id
             WHERE {where_clause}
@@ -638,455 +533,10 @@ class Workout:
         """Toggle template between public and private"""
         if not self.is_template:
             raise ValueError("Only templates can be made public/private")
+        self.is_public = 0 if self.is_public else 1
+        self.update(is_public=self.is_public)
+        return self.is_public
 
-        db = get_db()
-        new_status = 0 if self.is_public else 1
-
-        db.execute('''
-            UPDATE workouts
-            SET is_public = ?, updated_at = ?
-            WHERE id = ?
-        ''', (new_status, datetime.now().isoformat(), self.id))
-        db.commit()
-
-        self.is_public = new_status
-        return new_status
-
-    def increment_usage_count(self):
-        """Increment the usage count for this template"""
-        if not self.is_template:
-            return
-
-        db = get_db()
-        db.execute('''
-            UPDATE workouts
-            SET usage_count = usage_count + 1
-            WHERE id = ?
-        ''', (self.id,))
-        db.commit()
-
-        self.usage_count += 1
-
-    def convert_to_template(self):
-        """Convert an existing workout to a template"""
-        db = get_db()
-        db.execute('''
-            UPDATE workouts
-            SET is_template = 1, scheduled_date = NULL, scheduled_time = NULL,
-                status = 'planned', started_at = NULL, completed_at = NULL
-            WHERE id = ?
-        ''', (self.id,))
-        db.commit()
-
-        # Clear actual values from exercises
-        db.execute('''
-            UPDATE workout_exercises
-            SET actual_sets = NULL, actual_reps = NULL, actual_weight = NULL
-            WHERE workout_id = ?
-        ''', (self.id,))
-        db.commit()
-
-        self.is_template = 1
-
-
-class WorkoutExercise:
-    """Workout exercise junction table model"""
-
-    @staticmethod
-    def get_by_workout(workout_id):
-        """Get all exercises for a workout with exercise details"""
-        db = get_db()
-        rows = db.execute('''
-            SELECT we.*,
-                   e.name as exercise_name,
-                   e.description as exercise_description,
-                   c.name as category_name,
-                   GROUP_CONCAT(m.name, ', ') as primary_muscles
-            FROM workout_exercises we
-            JOIN exercises e ON we.exercise_id = e.id
-            LEFT JOIN categories c ON e.category_id = c.id
-            LEFT JOIN exercise_primary_muscles epm ON e.id = epm.exercise_id
-            LEFT JOIN muscles m ON epm.muscle_id = m.id
-            WHERE we.workout_id = ?
-            GROUP BY we.id
-            ORDER BY we.order_position
-        ''', (workout_id,)).fetchall()
-        return [dict(row) for row in rows]
-
-    @staticmethod
-    def get_by_id(workout_exercise_id):
-        """Get a specific workout exercise"""
-        db = get_db()
-        row = db.execute('''
-            SELECT we.*, e.name as exercise_name
-            FROM workout_exercises we
-            JOIN exercises e ON we.exercise_id = e.id
-            WHERE we.id = ?
-        ''', (workout_exercise_id,)).fetchone()
-        return dict(row) if row else None
-
-    @staticmethod
-    def add_to_workout(workout_id, exercise_id, order_position, **kwargs):
-        """Add exercise to workout"""
-        db = get_db()
-        cursor = db.execute('''
-            INSERT INTO workout_exercises
-            (workout_id, exercise_id, order_position, target_sets, target_reps, target_weight, target_duration, notes, superset_group_id, superset_target_reps, superset_actual_reps)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        ''', (
-            workout_id, exercise_id, order_position,
-            kwargs.get('target_sets'),
-            kwargs.get('target_reps'),
-            kwargs.get('target_weight'),
-            kwargs.get('target_duration'),
-            kwargs.get('notes'),
-            kwargs.get('superset_group_id'),
-            kwargs.get('superset_target_reps'),
-            kwargs.get('superset_actual_reps')
-        ))
-        db.commit()
-        return cursor.lastrowid
-
-    @staticmethod
-    def get_next_order_position(workout_id):
-        """Get the next order position for a workout"""
-        db = get_db()
-        row = db.execute('''
-            SELECT MAX(order_position) as max_pos
-            FROM workout_exercises
-            WHERE workout_id = ?
-        ''', (workout_id,)).fetchone()
-        return (row['max_pos'] or 0) + 1
-
-    @staticmethod
-    def update(workout_exercise_id, **kwargs):
-        """Update workout exercise"""
-        db = get_db()
-
-        fields = []
-        values = []
-
-        for key in ['actual_sets', 'actual_reps', 'actual_weight', 'actual_duration', 'target_sets', 'target_reps', 'target_weight', 'target_duration', 'notes', 'order_position', 'superset_target_reps', 'superset_actual_reps']:
-            if key in kwargs:
-                fields.append(f'{key} = ?')
-                values.append(kwargs[key])
-
-        if fields:
-            fields.append('updated_at = ?')
-            values.append(datetime.now())
-            values.append(workout_exercise_id)
-
-            query = f"UPDATE workout_exercises SET {', '.join(fields)} WHERE id = ?"
-            db.execute(query, values)
-            db.commit()
-
-    @staticmethod
-    def delete(workout_exercise_id):
-        """Remove exercise from workout"""
-        db = get_db()
-        db.execute('DELETE FROM workout_exercises WHERE id = ?', (workout_exercise_id,))
-        db.commit()
-
-    @staticmethod
-    def reorder(workout_exercise_id, direction):
-        """Reorder exercise in workout (move up or down)"""
-        db = get_db()
-
-        # Get current exercise
-        current = db.execute('''
-            SELECT id, workout_id, order_position
-            FROM workout_exercises
-            WHERE id = ?
-        ''', (workout_exercise_id,)).fetchone()
-
-        if not current:
-            return
-
-        current_pos = current['order_position']
-        workout_id = current['workout_id']
-
-        # Find the exercise to swap with
-        if direction == 'up':
-            swap_exercise = db.execute('''
-                SELECT id, order_position
-                FROM workout_exercises
-                WHERE workout_id = ? AND order_position < ?
-                ORDER BY order_position DESC
-                LIMIT 1
-            ''', (workout_id, current_pos)).fetchone()
-        else:  # down
-            swap_exercise = db.execute('''
-                SELECT id, order_position
-                FROM workout_exercises
-                WHERE workout_id = ? AND order_position > ?
-                ORDER BY order_position ASC
-                LIMIT 1
-            ''', (workout_id, current_pos)).fetchone()
-
-        if not swap_exercise:
-            return  # Already at the top or bottom
-
-        swap_pos = swap_exercise['order_position']
-
-        # Swap positions
-        db.execute('''
-            UPDATE workout_exercises
-            SET order_position = ?
-            WHERE id = ?
-        ''', (swap_pos, workout_exercise_id))
-
-        db.execute('''
-            UPDATE workout_exercises
-            SET order_position = ?
-            WHERE id = ?
-        ''', (current_pos, swap_exercise['id']))
-
-        db.commit()
-
-    @staticmethod
-    def set_order(workout_id, exercise_ids):
-        """Set absolute order for all exercises in a workout given an ordered list of IDs"""
-        db = get_db()
-        for i, exercise_id in enumerate(exercise_ids):
-            db.execute('''
-                UPDATE workout_exercises
-                SET order_position = ?
-                WHERE id = ? AND workout_id = ?
-            ''', (i + 1, exercise_id, workout_id))
-        db.commit()
-
-    # ===== SUPERSET METHODS =====
-
-    @staticmethod
-    def get_next_superset_group_id(workout_id):
-        """Get the next available superset group ID for a workout"""
-        db = get_db()
-        row = db.execute('''
-            SELECT MAX(superset_group_id) as max_group
-            FROM workout_exercises
-            WHERE workout_id = ?
-        ''', (workout_id,)).fetchone()
-        return (row['max_group'] or 0) + 1
-
-    @staticmethod
-    def create_superset(workout_exercise_ids):
-        """Group exercises into a superset"""
-        if len(workout_exercise_ids) < 2:
-            raise ValueError("Superset requires at least 2 exercises")
-
-        db = get_db()
-
-        # Get workout_id from first exercise
-        first = db.execute(
-            'SELECT workout_id FROM workout_exercises WHERE id = ?',
-            (workout_exercise_ids[0],)
-        ).fetchone()
-
-        if not first:
-            raise ValueError("Exercise not found")
-
-        workout_id = first['workout_id']
-
-        # Verify all exercises belong to same workout and are not already in a superset
-        for ex_id in workout_exercise_ids:
-            row = db.execute(
-                'SELECT workout_id, superset_group_id FROM workout_exercises WHERE id = ?',
-                (ex_id,)
-            ).fetchone()
-            if not row or row['workout_id'] != workout_id:
-                raise ValueError("All exercises must belong to the same workout")
-            if row['superset_group_id']:
-                raise ValueError("Exercise is already in a superset")
-
-        # Get next group ID
-        group_id = WorkoutExercise.get_next_superset_group_id(workout_id)
-
-        # Assign group ID to all exercises
-        for ex_id in workout_exercise_ids:
-            db.execute('''
-                UPDATE workout_exercises
-                SET superset_group_id = ?
-                WHERE id = ?
-            ''', (group_id, ex_id))
-
-        # Ensure exercises are consecutive in order
-        WorkoutExercise._consolidate_superset_order(workout_id, group_id)
-
-        db.commit()
-        return group_id
-
-    @staticmethod
-    def _consolidate_superset_order(workout_id, superset_group_id):
-        """Ensure superset exercises are consecutive in order"""
-        db = get_db()
-
-        # Get all exercises in the superset
-        superset_exercises = db.execute('''
-            SELECT id, order_position FROM workout_exercises
-            WHERE workout_id = ? AND superset_group_id = ?
-            ORDER BY order_position
-        ''', (workout_id, superset_group_id)).fetchall()
-
-        if not superset_exercises:
-            return
-
-        # Get the minimum position in the superset
-        min_pos = min(ex['order_position'] for ex in superset_exercises)
-
-        # Get exercises not in this superset that need to be shifted
-        non_superset_in_range = db.execute('''
-            SELECT id, order_position FROM workout_exercises
-            WHERE workout_id = ? AND (superset_group_id IS NULL OR superset_group_id != ?)
-            AND order_position >= ? AND order_position <= ?
-            ORDER BY order_position
-        ''', (workout_id, superset_group_id, min_pos,
-              max(ex['order_position'] for ex in superset_exercises))).fetchall()
-
-        # Move superset exercises to consecutive positions starting at min_pos
-        for i, ex in enumerate(superset_exercises):
-            new_pos = min_pos + i
-            if ex['order_position'] != new_pos:
-                db.execute('''
-                    UPDATE workout_exercises SET order_position = ?
-                    WHERE id = ?
-                ''', (new_pos, ex['id']))
-
-        # Shift non-superset exercises after the superset group
-        next_pos = min_pos + len(superset_exercises)
-        for ex in non_superset_in_range:
-            db.execute('''
-                UPDATE workout_exercises SET order_position = ?
-                WHERE id = ?
-            ''', (next_pos, ex['id']))
-            next_pos += 1
-
-    @staticmethod
-    def add_to_superset(workout_exercise_id, superset_group_id):
-        """Add an exercise to an existing superset"""
-        db = get_db()
-
-        # Get the exercise and its workout
-        exercise = db.execute(
-            'SELECT workout_id, order_position, superset_group_id FROM workout_exercises WHERE id = ?',
-            (workout_exercise_id,)
-        ).fetchone()
-
-        if not exercise:
-            raise ValueError("Exercise not found")
-
-        if exercise['superset_group_id']:
-            raise ValueError("Exercise is already in a superset")
-
-        # Verify superset exists in this workout
-        existing = db.execute('''
-            SELECT MIN(order_position) as min_pos, MAX(order_position) as max_pos
-            FROM workout_exercises
-            WHERE workout_id = ? AND superset_group_id = ?
-        ''', (exercise['workout_id'], superset_group_id)).fetchone()
-
-        if existing['min_pos'] is None:
-            raise ValueError("Superset group not found")
-
-        # Update the exercise's superset_group_id
-        db.execute('''
-            UPDATE workout_exercises
-            SET superset_group_id = ?
-            WHERE id = ?
-        ''', (superset_group_id, workout_exercise_id))
-
-        # Consolidate order
-        WorkoutExercise._consolidate_superset_order(
-            exercise['workout_id'],
-            superset_group_id
-        )
-
-        db.commit()
-
-    @staticmethod
-    def remove_from_superset(workout_exercise_id):
-        """Remove an exercise from its superset"""
-        db = get_db()
-
-        # Get exercise info
-        exercise = db.execute('''
-            SELECT workout_id, superset_group_id FROM workout_exercises WHERE id = ?
-        ''', (workout_exercise_id,)).fetchone()
-
-        if not exercise or not exercise['superset_group_id']:
-            return  # Not in a superset
-
-        workout_id = exercise['workout_id']
-        group_id = exercise['superset_group_id']
-
-        # Remove from superset
-        db.execute('''
-            UPDATE workout_exercises SET superset_group_id = NULL WHERE id = ?
-        ''', (workout_exercise_id,))
-
-        # Check if superset now has only 1 member
-        remaining = db.execute('''
-            SELECT COUNT(*) as count FROM workout_exercises
-            WHERE workout_id = ? AND superset_group_id = ?
-        ''', (workout_id, group_id)).fetchone()
-
-        # If only 1 exercise left, dissolve the superset
-        if remaining['count'] == 1:
-            db.execute('''
-                UPDATE workout_exercises SET superset_group_id = NULL
-                WHERE workout_id = ? AND superset_group_id = ?
-            ''', (workout_id, group_id))
-
-        db.commit()
-
-    @staticmethod
-    def dissolve_superset(workout_id, superset_group_id):
-        """Dissolve a superset (remove all exercises from it)"""
-        db = get_db()
-        db.execute('''
-            UPDATE workout_exercises SET superset_group_id = NULL,
-                   superset_target_reps = NULL, superset_actual_reps = NULL
-            WHERE workout_id = ? AND superset_group_id = ?
-        ''', (workout_id, superset_group_id))
-        db.commit()
-
-    @staticmethod
-    def update_superset_reps(workout_id, superset_group_id, target_reps=None, actual_reps=None):
-        """Update the reps for all exercises in a superset"""
-        db = get_db()
-        fields = []
-        values = []
-
-        if target_reps is not None:
-            fields.append('superset_target_reps = ?')
-            values.append(target_reps if target_reps else None)
-
-        if actual_reps is not None:
-            fields.append('superset_actual_reps = ?')
-            values.append(actual_reps if actual_reps else None)
-
-        if fields:
-            values.extend([workout_id, superset_group_id])
-            query = f"UPDATE workout_exercises SET {', '.join(fields)} WHERE workout_id = ? AND superset_group_id = ?"
-            db.execute(query, values)
-            db.commit()
-
-    @staticmethod
-    def get_superset_reps(workout_id, superset_group_id):
-        """Get the reps for a superset (from the first exercise in the group)"""
-        db = get_db()
-        row = db.execute('''
-            SELECT superset_target_reps, superset_actual_reps
-            FROM workout_exercises
-            WHERE workout_id = ? AND superset_group_id = ?
-            ORDER BY order_position
-            LIMIT 1
-        ''', (workout_id, superset_group_id)).fetchone()
-        if row:
-            return {
-                'target_reps': row['superset_target_reps'],
-                'actual_reps': row['superset_actual_reps']
-            }
-        return None
 
 
 class Exercise:
@@ -1110,15 +560,9 @@ class Exercise:
 
         exercise_dict = dict(exercise)
 
-        # Prepend /static/images/ to image URLs only if they are local filenames (not paths or URLs)
-        if exercise_dict.get('image1_url'):
-            url = exercise_dict['image1_url']
-            if not url.startswith('/') and not url.startswith('http'):
-                exercise_dict['image1_url'] = f"/static/images/{url}"
-        if exercise_dict.get('image2_url'):
-            url = exercise_dict['image2_url']
-            if not url.startswith('/') and not url.startswith('http'):
-                exercise_dict['image2_url'] = f"/static/images/{url}"
+        # Local filenames get the /static/images/ prefix; paths and URLs are used as-is
+        for key in ('image1_url', 'image2_url'):
+            exercise_dict[key] = Exercise._image_url(exercise_dict.get(key))
 
         # Get instructions
         instructions = db.execute('''
@@ -1153,6 +597,16 @@ class Exercise:
         exercise_dict['secondary_muscles'] = [row['name'] for row in secondary_muscles]
 
         return exercise_dict
+
+    @staticmethod
+    def _image_url(value):
+        """Public URL for a stored image value, preferring the smaller .webp copy if present."""
+        if not value or value.startswith('/') or value.startswith('http'):
+            return value
+        webp = os.path.splitext(value)[0] + '.webp'
+        if os.path.exists(os.path.join(current_app.static_folder, 'images', webp)):
+            value = webp
+        return f"/static/images/{value}"
 
     @staticmethod
     def get_all(limit=50, offset=0):
@@ -1299,6 +753,50 @@ class Exercise:
         return [dict(row) for row in rows]
 
     @staticmethod
+    def find(query=None, category=None, muscle=None, equipment=None, limit=30, offset=0):
+        """Search and filter exercises in one query.
+
+        Matches the text against the name (and, as a weaker match, the
+        description) and applies any of the filters. Name matches come first.
+        Returns (rows, total) where rows carry category_name and primary_muscles.
+        """
+        db = get_db()
+        conditions = []
+        params = []
+
+        if query:
+            conditions.append('(e.name LIKE ? OR e.description LIKE ?)')
+            params.extend([f'%{query}%', f'%{query}%'])
+        if category:
+            conditions.append('c.name = ?')
+            params.append(category)
+        if muscle:
+            conditions.append('''e.id IN (
+                SELECT exercise_id FROM exercise_primary_muscles x JOIN muscles m ON m.id = x.muscle_id WHERE m.name = ?
+                UNION
+                SELECT exercise_id FROM exercise_secondary_muscles x JOIN muscles m ON m.id = x.muscle_id WHERE m.name = ?)''')
+            params.extend([muscle, muscle])
+        if equipment:
+            conditions.append('''e.id IN (
+                SELECT exercise_id FROM exercise_equipment x JOIN equipment q ON q.id = x.equipment_id WHERE q.name = ?)''')
+            params.append(equipment)
+
+        where = (' WHERE ' + ' AND '.join(conditions)) if conditions else ''
+        base = f'FROM exercises e LEFT JOIN categories c ON e.category_id = c.id{where}'
+
+        total = db.execute(f'SELECT COUNT(*) {base}', params).fetchone()[0]
+        rows = db.execute(f'''
+            SELECT e.id, e.name, e.description, c.name AS category_name,
+                   (SELECT GROUP_CONCAT(m.name, ', ')
+                    FROM exercise_primary_muscles x JOIN muscles m ON m.id = x.muscle_id
+                    WHERE x.exercise_id = e.id) AS primary_muscles
+            {base}
+            ORDER BY {'e.name LIKE ? DESC, ' if query else ''}e.name
+            LIMIT ? OFFSET ?
+        ''', params + ([f'{query}%'] if query else []) + [limit, offset]).fetchall()
+        return [dict(row) for row in rows], total
+
+    @staticmethod
     def get_all_categories():
         """Get all available categories"""
         db = get_db()
@@ -1357,7 +855,7 @@ class StravaConnection:
                 token_data['expires_at'],
                 token_data.get('athlete', {}).get('id'),
                 token_data.get('athlete', {}).get('username'),
-                datetime.now(),
+                now(),
                 user_id
             ))
         else:
@@ -1450,7 +948,7 @@ class StravaUpload:
                 SET strava_activity_id = ?, upload_status = ?,
                     error_message = ?, uploaded_at = ?
                 WHERE workout_id = ?
-            ''', (strava_activity_id, status, error, datetime.now(), workout_id))
+            ''', (strava_activity_id, status, error, now(), workout_id))
         else:
             # Create new record
             db.execute('''

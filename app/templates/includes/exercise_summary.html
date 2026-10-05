@@ -1,0 +1,50 @@
+{# Read-only exercise list for workout and template detail pages.
+   Supersets are shown as one bordered group; logged sets replace the plan when present. #}
+{% macro exercise_row(exercise, label) %}
+<div class="summary-row">
+    <span class="summary-num">{{ label }}</span>
+    <div class="summary-main">
+        <div class="summary-name">{{ exercise.exercise_name }}</div>
+        {% set plan = exercise | plan_text %}
+        {% if exercise.sets_text %}
+            <div class="summary-done"><i class="fa-solid fa-check"></i> {{ exercise.sets_text }}</div>
+            {% if plan and plan != exercise.sets_text %}<div class="summary-plan">Plan: {{ plan }}</div>{% endif %}
+        {% elif plan %}
+            <div class="summary-plan">{{ plan }}</div>
+        {% endif %}
+        {% if exercise.notes %}<div class="summary-plan"><i class="fa-solid fa-note-sticky"></i> {{ exercise.notes }}</div>{% endif %}
+    </div>
+    <button type="button" class="btn btn-sm btn-outline-secondary btn-touch view-exercise-details"
+            data-exercise-id="{{ exercise.exercise_id }}" data-exercise-name="{{ exercise.exercise_name }}"
+            aria-label="Instructions for {{ exercise.exercise_name }}">
+        <i class="fa-solid fa-circle-info"></i>
+    </button>
+</div>
+{% endmacro %}
+
+{% macro exercise_summary(exercises) %}
+<div class="summary-list">
+    {% set ns = namespace(num=1, seen=[]) %}
+    {% for exercise in exercises %}
+        {% if exercise.superset_group_id %}
+            {% if exercise.superset_group_id not in ns.seen %}
+                {% set ns.seen = ns.seen + [exercise.superset_group_id] %}
+                {% set members = exercises | selectattr('superset_group_id', 'equalto', exercise.superset_group_id) | list %}
+                {% set rounds = members[0].superset_actual_reps or members[0].superset_target_reps %}
+                <div class="superset-group">
+                    <div class="superset-label mb-1">
+                        <i class="fa-solid fa-layer-group"></i> Superset{% if rounds %} · {{ rounds }} rounds{% endif %}
+                    </div>
+                    {% for member in members %}
+                        {{ exercise_row(member, ns.num ~ 'abcdefghijklmnopqrstuvwxyz'[loop.index0]) }}
+                    {% endfor %}
+                </div>
+                {% set ns.num = ns.num + 1 %}
+            {% endif %}
+        {% else %}
+            {{ exercise_row(exercise, ns.num) }}
+            {% set ns.num = ns.num + 1 %}
+        {% endif %}
+    {% endfor %}
+</div>
+{% endmacro %}

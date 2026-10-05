@@ -2,10 +2,18 @@
 
 import json
 import sqlite3
-from datetime import datetime, timezone
 from typing import Optional
 
+from gymcore import workouts as core
 from mcp_server.auth import get_current_auth
+
+
+def _writer():
+    """The current auth context, which must carry the readwrite scope."""
+    auth = get_current_auth()
+    if not auth.can_write():
+        raise PermissionError("readwrite scope required")
+    return auth
 
 
 def register_template_tools(mcp, conn: sqlite3.Connection) -> None:
@@ -101,55 +109,9 @@ def register_template_tools(mcp, conn: sqlite3.Connection) -> None:
         Returns:
             Dict with {workout_id}.
         """
-        auth = get_current_auth()
-        if not auth.can_write():
-            raise PermissionError("readwrite scope required")
-
-        template = conn.execute(
-            """SELECT id, name FROM workouts
-               WHERE id = ? AND is_template = 1 AND (user_id = ? OR is_public = 1)""",
-            (template_id, auth.user_id),
-        ).fetchone()
-        if not template:
-            raise ValueError(f"Template {template_id} not found")
-
-        now = datetime.now(timezone.utc).isoformat()
-        cursor = conn.execute(
-            """INSERT INTO workouts (user_id, name, status, scheduled_date,
-                                    is_template, created_at, updated_at)
-               VALUES (?, ?, 'planned', ?, 0, ?, ?)""",
-            (auth.user_id, template["name"], scheduled_date, now, now),
-        )
-        workout_id = cursor.lastrowid
-
-        template_exercises = conn.execute(
-            """SELECT exercise_id, order_position, target_sets, target_reps,
-                      target_weight, target_duration, superset_group_id, notes
-               FROM workout_exercises WHERE workout_id = ?
-               ORDER BY order_position""",
-            (template_id,),
-        ).fetchall()
-
-        for ex in template_exercises:
-            conn.execute(
-                """INSERT INTO workout_exercises
-                   (workout_id, exercise_id, order_position, target_sets, target_reps,
-                    target_weight, target_duration, superset_group_id, notes,
-                    created_at, updated_at)
-                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-                (
-                    workout_id, ex["exercise_id"], ex["order_position"],
-                    ex["target_sets"], ex["target_reps"], ex["target_weight"],
-                    ex["target_duration"], ex["superset_group_id"], ex["notes"], now, now,
-                ),
-            )
-
-        conn.execute(
-            "UPDATE workouts SET usage_count = usage_count + 1 WHERE id = ?",
-            (template_id,),
-        )
-        conn.commit()
-
+        auth = _writer()
+        with conn:
+            workout_id = core.create_from_template(conn, auth.user_id, template_id, scheduled_date)
         return {"workout_id": workout_id}
 
     @mcp.tool()
@@ -172,19 +134,10 @@ def register_template_tools(mcp, conn: sqlite3.Connection) -> None:
         Returns:
             Dict with {template_id}.
         """
-        auth = get_current_auth()
-        if not auth.can_write():
-            raise PermissionError("readwrite scope required")
-
-        now = datetime.now(timezone.utc).isoformat()
-        cursor = conn.execute(
-            """INSERT INTO workouts (user_id, name, notes, status,
-                                    is_template, is_public, created_at, updated_at)
-               VALUES (?, ?, ?, 'planned', 1, ?, ?, ?)""",
-            (auth.user_id, name, notes, 1 if is_public else 0, now, now),
-        )
-        conn.commit()
-        return {"template_id": cursor.lastrowid}
+        auth = _writer()
+        with conn:
+            template_id = core.create_template(conn, auth.user_id, name, notes, is_public)
+        return {"template_id": template_id}
 
     @mcp.tool()
     def update_template(
@@ -208,39 +161,17 @@ def register_template_tools(mcp, conn: sqlite3.Connection) -> None:
         Returns:
             Dict with {updated: true} on success.
         """
-        auth = get_current_auth()
-        if not auth.can_write():
-            raise PermissionError("readwrite scope required")
+        auth = _writer()
+        core.owned_workout(conn, auth.user_id, template_id, is_template=True)
 
-        row = conn.execute(
-            "SELECT id FROM workouts WHERE id = ? AND user_id = ? AND is_template = 1",
-            (template_id, auth.user_id),
-        ).fetchone()
-        if not row:
-            raise ValueError(f"Template {template_id} not found")
-
-        updates, params = [], []
-        if name is not None:
-            updates.append("name = ?")
-            params.append(name)
-        if notes is not None:
-            updates.append("notes = ?")
-            params.append(notes)
-        if is_public is not None:
-            updates.append("is_public = ?")
-            params.append(1 if is_public else 0)
-        if not updates:
+        fields = {"name": name, "notes": notes,
+                  "is_public": None if is_public is None else (1 if is_public else 0)}
+        fields = {key: value for key, value in fields.items() if value is not None}
+        if not fields:
             raise ValueError("No fields provided to update")
 
-        updates.append("updated_at = ?")
-        params.append(datetime.now(timezone.utc).isoformat())
-        params.append(template_id)
-
-        conn.execute(
-            f"UPDATE workouts SET {', '.join(updates)} WHERE id = ?",
-            params,
-        )
-        conn.commit()
+        with conn:
+            core.update_workout(conn, template_id, **fields)
         return {"updated": True}
 
     @mcp.tool()
@@ -256,18 +187,8 @@ def register_template_tools(mcp, conn: sqlite3.Connection) -> None:
         Returns:
             Dict with {deleted: true} on success.
         """
-        auth = get_current_auth()
-        if not auth.can_write():
-            raise PermissionError("readwrite scope required")
-
-        row = conn.execute(
-            "SELECT id FROM workouts WHERE id = ? AND user_id = ? AND is_template = 1",
-            (template_id, auth.user_id),
-        ).fetchone()
-        if not row:
-            raise ValueError(f"Template {template_id} not found")
-
-        conn.execute("DELETE FROM workout_exercises WHERE workout_id = ?", (template_id,))
-        conn.execute("DELETE FROM workouts WHERE id = ?", (template_id,))
-        conn.commit()
+        auth = _writer()
+        core.owned_workout(conn, auth.user_id, template_id, is_template=True)
+        with conn:
+            core.delete_workout(conn, template_id)
         return {"deleted": True}

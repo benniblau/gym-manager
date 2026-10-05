@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+
+{% block title %}Offline - Gym Manager{% endblock %}
+
+{% block content %}
+<div class="container text-center py-5">
+    <p class="display-4 text-muted mb-2"><i class="fa-solid fa-wifi"></i></p>
+    <h1 class="h3">You're offline</h1>
+    <p class="text-muted">This page isn't available without a connection. Sets you logged while offline are kept on this device and sent when you're back online.</p>
+    <button class="btn btn-primary btn-touch mt-2" onclick="location.reload()">
+        <i class="fa-solid fa-rotate"></i> Try again
+    </button>
+</div>
+{% endblock %}

@@ -7,9 +7,16 @@ load_dotenv()
 
 class Config:
     """Base configuration"""
+    # Development fallback only; production refuses to start without SECRET_KEY (see create_app)
     SECRET_KEY = os.environ.get('SECRET_KEY') or 'dev-secret-key-change-in-production-7f8d9a6b5c4e3d2f1a0b9c8d7e6f5a4b'
-    DATABASE_PATH = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'exercises.db')
+    DATABASE_PATH = os.environ.get('DATABASE_PATH') or os.path.join(os.path.dirname(os.path.dirname(__file__)), 'exercises.db')
     WTF_CSRF_ENABLED = True
+    # Tokens live as long as the session: a logging page stays open for a whole workout
+    WTF_CSRF_TIME_LIMIT = None
+    SESSION_COOKIE_HTTPONLY = True
+    SESSION_COOKIE_SAMESITE = 'Lax'
+    REMEMBER_COOKIE_HTTPONLY = True
+    REMEMBER_COOKIE_SAMESITE = 'Lax'
 
     # External URL for generating absolute URLs (used in production)
     EXTERNAL_URL = os.environ.get('EXTERNAL_URL')
@@ -37,8 +44,8 @@ class ProductionConfig(Config):
     """Production configuration"""
     DEBUG = False
     TESTING = False
-    # In production, SECRET_KEY should be set via environment variable
-    # If not set, this will use the default from Config base class (not recommended for production)
+    SESSION_COOKIE_SECURE = True
+    REMEMBER_COOKIE_SECURE = True
 
 
 class TestingConfig(Config):

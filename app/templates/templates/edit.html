@@ -1,134 +1,53 @@
 {% extends "base.html" %}
-{% from 'includes/exercise_card.html' import current_exercises_list, add_exercises_panel %}
+{% from 'includes/exercise_card.html' import exercise_editor %}
 
 {% block title %}Edit {{ workout.name }} - Gym Manager{% endblock %}
+{% block body_class %}has-actionbar no-tabbar{% endblock %}
 
 {% block content %}
 <div class="container">
-    <h1 class="mb-4">
-        <i class="fa-solid fa-bookmark"></i> Edit Template: {{ workout.name }}
-    </h1>
-
-    <!-- Template info -->
-    <div class="alert alert-info">
-        <i class="fa-solid fa-circle-info"></i> This is a template. Add exercises and set target values that will be used when creating new workouts.
+    <div class="page-header">
+        <h1><i class="fa-solid fa-bookmark text-primary"></i> {{ workout.name }}</h1>
+        <span class="badge badge-status status-planned">
+            <i class="fa-solid {{ 'fa-globe' if workout.is_public else 'fa-lock' }}"></i> {{ 'Public' if workout.is_public else 'Private' }}
+        </span>
     </div>
 
-    <!-- Edit Template Name -->
-    <div class="card mb-4">
-        <div class="card-header">
-            <h5 class="mb-0"><i class="fa-solid fa-tag"></i> Template Name</h5>
-        </div>
-        <div class="card-body">
-            <form method="POST" action="{{ url_for('workouts.update_name', workout_id=workout.id) }}" id="name-form">
-                <div class="input-group">
-                    <input type="text" class="form-control" name="name" id="workout-name" value="{{ workout.name }}" required maxlength="100">
-                    <button type="submit" class="btn btn-primary">
-                        <i class="fa-solid fa-circle-check"></i> Update Name
-                    </button>
-                </div>
-            </form>
-        </div>
-    </div>
-
-    <!-- Edit Template Notes -->
-    <div class="card mb-4">
-        <div class="card-header">
-            <h5 class="mb-0"><i class="fa-solid fa-note-sticky"></i> Template Notes</h5>
-        </div>
-        <div class="card-body">
-            <form method="POST" action="{{ url_for('templates.update_notes', template_id=workout.id) }}">
-                <div class="mb-3">
-                    <textarea class="form-control" name="notes" id="template-notes" rows="3" placeholder="Add notes about this template...">{{ workout.notes or '' }}</textarea>
-                </div>
-                <button type="submit" class="btn btn-primary">
-                    <i class="fa-solid fa-circle-check"></i> Update Notes
-                </button>
-            </form>
-        </div>
-    </div>
-
-    <!-- Privacy Settings -->
-    <div class="card mb-4">
-        <div class="card-header">
-            <h5 class="mb-0"><i class="fa-solid fa-shield-halved"></i> Privacy Settings</h5>
-        </div>
-        <div class="card-body">
-            <div class="d-flex justify-content-between align-items-center">
-                <div>
-                    <h6 class="mb-1">
-                        Status:
-                        {% if workout.is_public %}
-                            <span class="badge bg-success"><i class="fa-solid fa-globe"></i> Public</span>
-                        {% else %}
-                            <span class="badge bg-secondary"><i class="fa-solid fa-lock"></i> Private</span>
-                        {% endif %}
-                    </h6>
-                    <p class="text-muted mb-0">
-                        {% if workout.is_public %}
-                            This template can be discovered and used by all users.
-                            <br><strong>Times used:</strong> {{ workout.usage_count }}
-                        {% else %}
-                            Only you can see and use this template.
-                        {% endif %}
-                    </p>
-                </div>
-                <div>
-                    <form method="POST" action="{{ url_for('templates.toggle_privacy', template_id=workout.id) }}">
-                        <button type="submit" class="btn btn-outline-primary">
-                            {% if workout.is_public %}
-                                <i class="fa-solid fa-lock"></i> Make Private
-                            {% else %}
-                                <i class="fa-solid fa-globe"></i> Make Public
-                            {% endif %}
-                        </button>
-                    </form>
-                </div>
+    <details class="details-card" {{ 'open' if not exercises }}>
+        <summary>
+            <span><i class="fa-solid fa-sliders"></i> Details</span>
+            <span class="text-muted small">Name, notes, sharing</span>
+        </summary>
+        <form method="POST" action="{{ url_for('workouts.update_details', workout_id=workout.id) }}">
+            {{ csrf_field() }}
+            <div class="mb-3">
+                <label for="workout-name" class="form-label">Name</label>
+                <input type="text" class="form-control" name="name" id="workout-name" value="{{ workout.name }}" required maxlength="100">
             </div>
-        </div>
-    </div>
-
-    <div class="row">
-        <!-- Current exercises -->
-        <div class="col-md-6 mb-4">
-            <div class="card">
-                <div class="card-header d-flex justify-content-between align-items-center">
-                    <h5 class="mb-0"><i class="fa-solid fa-list-check"></i> Current Exercises ({{ exercises|length }})</h5>
-                    {% if exercises|length >= 2 %}
-                    <button id="toggle-selection-mode" class="btn btn-sm btn-outline-superset" title="Select exercises to create superset">
-                        <i class="fa-solid fa-layer-group"></i> Superset Mode
-                    </button>
-                    {% endif %}
-                </div>
-                <div class="card-body">
-                    <!-- Superset toolbar (hidden until selection mode) -->
-                    <div id="superset-toolbar" class="superset-toolbar" style="display: none;">
-                        <span class="superset-toolbar-label"><i class="fa-solid fa-layer-group"></i> Select 2+ exercises</span>
-                        <span id="selected-count" class="badge bg-secondary">0 selected</span>
-                        <button id="create-superset-btn" class="btn btn-sm btn-superset" disabled>
-                            <i class="fa-solid fa-link"></i> Create Superset
-                        </button>
-                        <button id="cancel-selection-btn" class="btn btn-sm btn-outline-secondary">
-                            <i class="fa-solid fa-xmark"></i> Cancel
-                        </button>
-                    </div>
-
-                    {{ current_exercises_list(exercises, show_rounds=false) }}
-                </div>
+            <div class="mb-3">
+                <label for="template-notes" class="form-label">Notes</label>
+                <textarea class="form-control" name="notes" id="template-notes" rows="2">{{ workout.notes or '' }}</textarea>
             </div>
-        </div>
+            <button type="submit" class="btn btn-primary btn-touch w-100">Save details</button>
+        </form>
+        <hr>
+        <form method="POST" action="{{ url_for('templates.toggle_privacy', template_id=workout.id) }}" class="d-flex align-items-center justify-content-between gap-3">
+            {{ csrf_field() }}
+            <input type="hidden" name="from" value="edit">
+            <span class="small text-muted">
+                {% if workout.is_public %}
+                    Everyone can find and use this template. Used {{ workout.usage_count }} times.
+                {% else %}
+                    Only you can see and use this template.
+                {% endif %}
+            </span>
+            <button type="submit" class="btn btn-outline-secondary btn-touch text-nowrap">
+                {% if workout.is_public %}<i class="fa-solid fa-lock"></i> Make private{% else %}<i class="fa-solid fa-globe"></i> Make public{% endif %}
+            </button>
+        </form>
+    </details>
 
-        <!-- Add exercises -->
-        <div class="col-md-6 mb-4">
-            {{ add_exercises_panel(all_exercises, categories, muscles) }}
-        </div>
-    </div>
-
-    <div class="mb-4">
-        <a href="{{ url_for('templates.detail', template_id=workout.id) }}" class="btn btn-outline-secondary">
-            <i class="fa-solid fa-arrow-left"></i> Back to Template
-        </a>
-    </div>
+    {{ exercise_editor(workout, exercises, categories, muscles, url_for('templates.detail', template_id=workout.id)) }}
 </div>
 
 {% include 'includes/exercise_modal.html' %}
@@ -136,6 +55,6 @@
 {% endblock %}
 
 {% block extra_js %}
-<script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.3/Sortable.min.js"></script>
+<script src="{{ url_for('static', filename='vendor/sortable.min.js') }}"></script>
 <script src="{{ url_for('static', filename='js/workout-edit.js') }}"></script>
 {% endblock %}

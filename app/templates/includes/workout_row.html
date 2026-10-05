@@ -1,0 +1,13 @@
+{# One tappable workout row, used on the dashboard and the workout list #}
+{% macro workout_row(workout) %}
+<a href="{{ url_for('workouts.detail', workout_id=workout.id) }}" class="row-link">
+    <div class="row-main">
+        <div class="row-title">{{ workout.name }}</div>
+        <div class="row-sub">
+            {{ workout.scheduled_date | nice_date or 'No date' }}{% if workout.scheduled_time %} · {{ workout.scheduled_time | nice_time }}{% endif %}{% if workout.duration_minutes %} · {{ workout.duration_minutes | duration_text }}{% endif %}
+        </div>
+    </div>
+    <span class="badge badge-status status-{{ workout.status }}">{{ workout.status | status_label }}</span>
+    <i class="fa-solid fa-chevron-right row-chevron"></i>
+</a>
+{% endmacro %}

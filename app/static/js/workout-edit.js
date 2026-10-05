@@ -1,517 +1,291 @@
 // Workout/Template Edit Page JavaScript
-// Consolidated handler for exercise management, supersets, search and filtering.
-// Works for both /workouts/<id>/edit and /templates/<id>/edit pages.
+// Exercise list (edit, reorder, supersets) and the add-exercise picker.
+// Works for both /workouts/<id>/edit and /templates/<id>/edit: a template is a
+// workout row, so every request goes to the /workouts/<id>/... routes.
+// Each change returns the re-rendered list, which is swapped in place.
 
 document.addEventListener('DOMContentLoaded', function() {
+    const container = document.getElementById('exercise-list-container');
+    if (!container) return;
 
-    // ===== URL HELPERS =====
-
-    // Detect page context from URL
-    function getBaseUrl() {
-        const pathParts = window.location.pathname.split('/');
-        const baseType = pathParts[1]; // 'workouts' or 'templates'
-        const id = pathParts[2];
-        return `/${baseType}/${id}`;
-    }
-
-    const baseUrl = getBaseUrl();
-    const entityId = baseUrl.split('/')[2];
-    const isTemplate = baseUrl.startsWith('/templates');
-
-    // Exercise CRUD endpoints always go through /workouts/ routes
-    function exerciseUrl(exerciseId, action) {
-        const prefix = isTemplate ? '/workouts' : baseUrl.split('/').slice(0, 2).join('/');
-        return `${prefix}/${entityId}/exercises/${exerciseId}/${action}`;
-    }
-
-    // Superset endpoints use the current baseUrl (both blueprints have routes)
-    function supersetUrl(action) {
-        return `${baseUrl}/superset/${action}`;
-    }
-
-    // ===== GENERIC POST HELPER =====
-
-    async function postAction(url, body, onSuccess) {
-        try {
-            const response = await fetch(url, {
-                method: 'POST',
-                body: body || undefined
-            });
-            const data = await response.json();
-            if (data.success) {
-                if (onSuccess) onSuccess(data);
-                else location.reload();
-            } else {
-                alert(data.error || 'Action failed');
-            }
-        } catch (error) {
-            console.error('Action failed:', error);
-            alert('Action failed. Please try again.');
-        }
-    }
-
-    // ===== EVENT DELEGATION ON CURRENT EXERCISES =====
-
-    const currentExercises = document.getElementById('current-exercises');
-    if (currentExercises) {
-        currentExercises.addEventListener('click', function(e) {
-            const button = e.target.closest('button');
-            if (!button) return;
-
-            const exerciseId = button.getAttribute('data-exercise-id');
-
-            // Edit exercise
-            if (button.classList.contains('edit-exercise')) {
-                e.stopPropagation();
-                openEditModal(button);
-                return;
-            }
-
-            // Remove exercise
-            if (button.classList.contains('remove-exercise')) {
-                e.stopPropagation();
-                if (!confirm('Remove this exercise from the workout?')) return;
-                postAction(exerciseUrl(exerciseId, 'remove'));
-                return;
-            }
-
-            // Duplicate exercise
-            if (button.classList.contains('duplicate-exercise')) {
-                e.stopPropagation();
-                postAction(exerciseUrl(exerciseId, 'duplicate'));
-                return;
-            }
-
-            // Reorder exercise
-            if (button.classList.contains('reorder-exercise')) {
-                e.stopPropagation();
-                const direction = button.getAttribute('data-direction');
-                const formData = new URLSearchParams({ direction: direction });
-                postAction(exerciseUrl(exerciseId, 'reorder'), formData);
-                return;
-            }
-
-            // Remove from superset
-            if (button.classList.contains('remove-from-superset')) {
-                e.stopPropagation();
-                postAction(exerciseUrl(exerciseId, 'remove-from-superset'));
-                return;
-            }
-
-            // Dissolve superset
-            if (button.classList.contains('dissolve-superset')) {
-                if (!confirm('Dissolve this superset? Exercises will become standalone.')) return;
-                const supersetId = button.getAttribute('data-superset-id');
-                postAction(`${baseUrl}/superset/${supersetId}/dissolve`);
-                return;
-            }
-
-            // Reorder superset (move entire group)
-            if (button.classList.contains('reorder-superset')) {
-                const supersetId = button.getAttribute('data-superset-id');
-                const direction = button.getAttribute('data-direction');
-                const supersetGroup = document.querySelector(`.superset-group[data-superset-id="${supersetId}"]`);
-                const firstExercise = supersetGroup.querySelector('.list-group-item');
-                if (!firstExercise) return;
-                const firstExerciseId = firstExercise.dataset.exerciseId;
-                const formData = new URLSearchParams({ direction: direction });
-                postAction(exerciseUrl(firstExerciseId, 'reorder'), formData);
-                return;
-            }
-        });
-    }
-
-    // ===== EDIT EXERCISE MODAL =====
-
-    function openEditModal(button) {
-        const exerciseId = button.getAttribute('data-exercise-id');
-        const exerciseName = button.getAttribute('data-exercise-name');
-        const targetSets = button.getAttribute('data-target-sets');
-        const targetReps = button.getAttribute('data-target-reps');
-        const targetWeight = button.getAttribute('data-target-weight');
-        const targetDuration = button.getAttribute('data-target-duration');
-        const notes = button.getAttribute('data-notes');
-
-        document.getElementById('modal-exercise-name').textContent = exerciseName;
-        document.getElementById('modal-exercise-id').value = exerciseId;
-        document.getElementById('target-sets').value = targetSets || '';
-        document.getElementById('target-reps').value = targetReps || '';
-        document.getElementById('target-weight').value = targetWeight || '';
-        document.getElementById('target-duration').value = targetDuration || '';
-        document.getElementById('exercise-notes').value = notes || '';
-
-        document.querySelector('#exerciseModal .modal-title').textContent = 'Edit Exercise';
-        document.getElementById('confirm-add-exercise').textContent = 'Update Exercise';
-        document.getElementById('confirm-add-exercise').setAttribute('data-mode', 'edit');
-
-        const modal = new bootstrap.Modal(document.getElementById('exerciseModal'));
-        modal.show();
-    }
-
-    // ===== ADD EXERCISE MODAL (from exercise list) =====
-    // Uses delegation on #exercise-list for dynamically loaded items
-
-    const exerciseList = document.getElementById('exercise-list');
-    if (exerciseList) {
-        exerciseList.addEventListener('click', function(e) {
-            const button = e.target.closest('.add-exercise');
-            if (!button) return;
-
-            const exerciseId = button.getAttribute('data-exercise-id');
-            const exerciseName = button.getAttribute('data-exercise-name');
-
-            document.getElementById('modal-exercise-name').textContent = exerciseName;
-            document.getElementById('modal-exercise-id').value = exerciseId;
-            document.getElementById('target-sets').value = 3;
-            document.getElementById('target-reps').value = 10;
-            document.getElementById('target-weight').value = '';
-            document.getElementById('target-duration').value = '';
-            document.getElementById('exercise-notes').value = '';
-
-            document.querySelector('#exerciseModal .modal-title').textContent = 'Add Exercise';
-            document.getElementById('confirm-add-exercise').textContent = 'Add Exercise';
-            document.getElementById('confirm-add-exercise').setAttribute('data-mode', 'add');
-
-            const modal = new bootstrap.Modal(document.getElementById('exerciseModal'));
-            modal.show();
-        });
-    }
-
-    // ===== CONFIRM ADD/EDIT EXERCISE =====
-
-    const confirmAddButton = document.getElementById('confirm-add-exercise');
-    if (confirmAddButton) {
-        confirmAddButton.addEventListener('click', function() {
-            const exerciseId = document.getElementById('modal-exercise-id').value;
-            const targetSets = document.getElementById('target-sets').value;
-            const targetReps = document.getElementById('target-reps').value;
-            const targetWeight = document.getElementById('target-weight').value;
-            const targetDuration = document.getElementById('target-duration').value;
-            const notes = document.getElementById('exercise-notes').value;
-            const mode = this.getAttribute('data-mode') || 'add';
-
-            const action = mode === 'edit' ? `${exerciseId}/update-targets` : 'add';
-            const url = isTemplate
-                ? `/workouts/${entityId}/exercises/${action}`
-                : `${baseUrl}/exercises/${action}`;
-
-            fetch(url, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-                body: new URLSearchParams({
-                    exercise_id: exerciseId,
-                    target_sets: targetSets,
-                    target_reps: targetReps,
-                    target_weight: targetWeight,
-                    target_duration: targetDuration,
-                    notes: notes
-                })
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.success) {
-                    bootstrap.Modal.getInstance(document.getElementById('exerciseModal')).hide();
-                    location.reload();
-                } else {
-                    alert(`Error ${mode === 'edit' ? 'updating' : 'adding'} exercise: ` + (data.error || 'Unknown error'));
-                }
-            })
-            .catch(error => {
-                alert(`Error ${mode === 'edit' ? 'updating' : 'adding'} exercise: ` + error);
-            });
-        });
-    }
-
-    // ===== DRAG AND DROP REORDER =====
-
-    let topSortable = null;
-    const supersetSortables = [];
-
-    function collectOrder() {
-        const order = [];
-        if (!currentExercises) return order;
-        Array.from(currentExercises.children).forEach(child => {
-            if (child.classList.contains('list-group-item') && child.dataset.exerciseId) {
-                order.push(parseInt(child.dataset.exerciseId));
-            } else if (child.classList.contains('superset-group')) {
-                child.querySelectorAll(':scope > .list-group-item').forEach(item => {
-                    if (item.dataset.exerciseId) {
-                        order.push(parseInt(item.dataset.exerciseId));
-                    }
-                });
-            }
-        });
-        return order;
-    }
-
-    async function saveOrder() {
-        const order = collectOrder();
-        if (!order.length) return;
-        try {
-            const response = await fetch(`/workouts/${entityId}/exercises/set-order`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ order })
-            });
-            const data = await response.json();
-            if (data.success) {
-                location.reload();
-            } else {
-                alert('Failed to save order: ' + (data.error || 'Unknown error'));
-            }
-        } catch (error) {
-            console.error('Error saving order:', error);
-            alert('Failed to save order. Please try again.');
-        }
-    }
-
-    if (currentExercises && typeof Sortable !== 'undefined') {
-        // Top-level sortable: standalone exercises + superset groups
-        topSortable = Sortable.create(currentExercises, {
-            handle: '.drag-handle',
-            animation: 150,
-            ghostClass: 'sortable-ghost',
-            chosenClass: 'sortable-chosen',
-            draggable: '.list-group-item, .superset-group',
-            filter: '.superset-no-rest',
-            onEnd: saveOrder
-        });
-
-        // Within-superset sortable: exercises inside each superset group
-        document.querySelectorAll('.superset-group').forEach(group => {
-            const s = Sortable.create(group, {
-                handle: '.drag-handle',
-                animation: 150,
-                ghostClass: 'sortable-ghost',
-                chosenClass: 'sortable-chosen',
-                draggable: '.list-group-item',
-                onEnd: saveOrder
-            });
-            supersetSortables.push(s);
-        });
-    }
-
-    function setSortableDisabled(disabled) {
-        if (topSortable) topSortable.option('disabled', disabled);
-        supersetSortables.forEach(s => s.option('disabled', disabled));
-    }
-
-    // ===== SUPERSET ROUNDS (workouts only) =====
-
-    document.querySelectorAll('.superset-rounds-input').forEach(input => {
-        input.addEventListener('change', async function() {
-            const supersetId = this.dataset.supersetId;
-            const targetReps = this.value;
-
-            const formData = new FormData();
-            if (targetReps) formData.append('target_reps', targetReps);
-
-            postAction(`/workouts/${entityId}/superset/${supersetId}/update-reps`, formData);
-        });
-    });
-
-    // ===== SUPERSET SELECTION MODE =====
-
-    let selectionMode = false;
-    let selectedExercises = new Set();
-
+    const baseUrl = `/workouts/${container.dataset.workoutId}`;
+    const countEl = document.getElementById('exercise-count');
     const toggleSelectionBtn = document.getElementById('toggle-selection-mode');
     const supersetToolbar = document.getElementById('superset-toolbar');
     const createSupersetBtn = document.getElementById('create-superset-btn');
     const cancelSelectionBtn = document.getElementById('cancel-selection-btn');
-    const selectedCountBadge = document.getElementById('selected-count');
+    const selectedCountEl = document.getElementById('selected-count');
+
+    const exerciseUrl = (exerciseId, action) => `${baseUrl}/exercises/${exerciseId}/${action}`;
+
+    // ===== LIST UPDATES =====
+
+    function render(data) {
+        container.innerHTML = data.html;
+        countEl.textContent = data.count;
+        toggleSelectionBtn.hidden = data.count < 2;
+        exitSelectionMode();
+        initSortable();
+    }
+
+    // POST a change and swap in the returned list. Returns true on success.
+    async function change(url, body, doneMessage) {
+        try {
+            render(await gm.post(url, body));
+            if (doneMessage) gm.toast(doneMessage, 'success');
+            return true;
+        } catch (error) {
+            gm.toast(error.message, 'danger');
+            return false;
+        }
+    }
+
+    async function reloadList() {
+        try {
+            const response = await fetch(`${baseUrl}/exercises/list`);
+            render(await response.json());
+        } catch (error) {
+            window.location.reload();
+        }
+    }
+
+    // ===== EVENT DELEGATION ON THE LIST =====
+    // The list markup is replaced after every change, so handlers live on the container.
+
+    container.addEventListener('click', async function(e) {
+        const button = e.target.closest('button');
+
+        if (selectionMode) {
+            const item = e.target.closest('.exercise-selectable');
+            if (item && !e.target.closest('.exercise-actions')) {
+                e.preventDefault();
+                toggleSelected(item);
+            }
+            return;
+        }
+        if (!button) return;
+
+        const exerciseId = button.dataset.exerciseId;
+
+        if (button.classList.contains('edit-exercise')) {
+            openTargetModal('edit', button.dataset);
+        } else if (button.classList.contains('remove-exercise')) {
+            const yes = await gm.confirm(`Remove ${button.dataset.exerciseName}?`, { okLabel: 'Remove', danger: true });
+            if (yes) change(exerciseUrl(exerciseId, 'remove'));
+        } else if (button.classList.contains('duplicate-exercise')) {
+            change(exerciseUrl(exerciseId, 'duplicate'));
+        } else if (button.classList.contains('reorder-exercise')) {
+            change(exerciseUrl(exerciseId, 'reorder'), new URLSearchParams({ direction: button.dataset.direction }));
+        } else if (button.classList.contains('remove-from-superset')) {
+            change(exerciseUrl(exerciseId, 'remove-from-superset'));
+        } else if (button.classList.contains('dissolve-superset')) {
+            const yes = await gm.confirm('Dissolve this superset? Its exercises stay in the workout.', { okLabel: 'Dissolve' });
+            if (yes) change(`${baseUrl}/superset/${button.dataset.supersetId}/dissolve`);
+        }
+    });
+
+    // Planned rounds of a superset
+    container.addEventListener('change', async function(e) {
+        const input = e.target.closest('.superset-rounds-input');
+        if (!input) return;
+        try {
+            await gm.post(`${baseUrl}/superset/${input.dataset.supersetId}/update-reps`,
+                new URLSearchParams({ target_reps: input.value || 0 }));
+        } catch (error) {
+            gm.toast(error.message, 'danger');
+        }
+    });
+
+    // ===== TARGET MODAL (add from picker, or edit an entry) =====
+
+    const modalEl = document.getElementById('exerciseModal');
+    const targetForm = document.getElementById('exercise-target-form');
+    const confirmButton = document.getElementById('confirm-add-exercise');
+    const field = id => document.getElementById(id);
+    let modalMode = 'add';
+
+    function openTargetModal(mode, data) {
+        modalMode = mode;
+        field('modal-exercise-name').textContent = data.exerciseName;
+        field('modal-exercise-id').value = data.exerciseId;
+        field('target-sets').value = mode === 'edit' ? data.targetSets : 3;
+        field('target-reps').value = mode === 'edit' ? data.targetReps : 10;
+        field('target-weight').value = mode === 'edit' ? data.targetWeight : '';
+        field('target-duration').value = mode === 'edit' ? data.targetDuration : '';
+        field('exercise-notes').value = mode === 'edit' ? data.notes : '';
+        confirmButton.textContent = mode === 'edit' ? 'Save' : 'Add';
+        bootstrap.Modal.getOrCreateInstance(modalEl).show();
+    }
+
+    targetForm.addEventListener('submit', async function(e) {
+        e.preventDefault();
+        const exerciseId = field('modal-exercise-id').value;
+        const name = field('modal-exercise-name').textContent;
+        const body = new URLSearchParams({
+            exercise_id: exerciseId,
+            target_sets: field('target-sets').value,
+            target_reps: field('target-reps').value,
+            target_weight: field('target-weight').value,
+            target_duration: field('target-duration').value,
+            notes: field('exercise-notes').value,
+        });
+        const url = modalMode === 'edit' ? exerciseUrl(exerciseId, 'update-targets') : `${baseUrl}/exercises/add`;
+
+        confirmButton.disabled = true;
+        const ok = await change(url, body, modalMode === 'add' ? `Added ${name}` : null);
+        confirmButton.disabled = false;
+        if (ok) bootstrap.Modal.getInstance(modalEl).hide();
+    });
+
+    // ===== DRAG AND DROP REORDER =====
+
+    let sortables = [];
+
+    function collectOrder() {
+        return Array.from(container.querySelectorAll('.exercise-selectable'))
+            .map(item => parseInt(item.dataset.exerciseId));
+    }
+
+    async function saveOrder() {
+        const ok = await change(`${baseUrl}/exercises/set-order`, { order: collectOrder() });
+        if (!ok) reloadList();
+    }
+
+    function initSortable() {
+        sortables.forEach(s => s.destroy());
+        sortables = [];
+        const list = document.getElementById('current-exercises');
+        if (!list || typeof Sortable === 'undefined') return;
+
+        const options = {
+            handle: '.drag-handle',
+            animation: 150,
+            ghostClass: 'sortable-ghost',
+            chosenClass: 'sortable-chosen',
+            onEnd: saveOrder,
+        };
+        // Top level: standalone exercises and whole superset groups
+        sortables.push(Sortable.create(list, { ...options, draggable: '.list-group-item, .superset-group' }));
+        // Inside each superset: its own exercises
+        list.querySelectorAll('.superset-group').forEach(group => {
+            sortables.push(Sortable.create(group, { ...options, draggable: '.list-group-item' }));
+        });
+    }
+
+    // ===== SUPERSET SELECTION MODE =====
+
+    let selectionMode = false;
+    const selected = new Set();
+
+    function updateSelectedCount() {
+        selectedCountEl.textContent = selected.size;
+        createSupersetBtn.disabled = selected.size < 2;
+    }
+
+    function toggleSelected(item) {
+        if (item.dataset.supersetId) {
+            gm.toast('Already in a superset');
+            return;
+        }
+        const id = item.dataset.exerciseId;
+        if (selected.has(id)) selected.delete(id);
+        else selected.add(id);
+        item.classList.toggle('selected', selected.has(id));
+        updateSelectedCount();
+    }
 
     function enterSelectionMode() {
         selectionMode = true;
-        selectedExercises.clear();
-        setSortableDisabled(true);
-        supersetToolbar.style.display = 'flex';
+        selected.clear();
+        sortables.forEach(s => s.option('disabled', true));
+        container.classList.add('selecting');
+        supersetToolbar.hidden = false;
         toggleSelectionBtn.classList.add('active');
-        toggleSelectionBtn.innerHTML = '<i class="fa-solid fa-check"></i> Done';
-
-        document.querySelectorAll('.exercise-selectable').forEach(item => {
-            if (!item.dataset.supersetId) {
-                item.addEventListener('click', handleExerciseSelection);
-                item.style.cursor = 'pointer';
-            }
-        });
         updateSelectedCount();
     }
 
     function exitSelectionMode() {
         selectionMode = false;
-        selectedExercises.clear();
-        setSortableDisabled(false);
-        supersetToolbar.style.display = 'none';
+        selected.clear();
+        sortables.forEach(s => s.option('disabled', false));
+        container.classList.remove('selecting');
+        container.querySelectorAll('.selected').forEach(item => item.classList.remove('selected'));
+        supersetToolbar.hidden = true;
         toggleSelectionBtn.classList.remove('active');
-        toggleSelectionBtn.innerHTML = '<i class="fa-solid fa-layer-group"></i> Superset Mode';
-
-        document.querySelectorAll('.exercise-selectable').forEach(item => {
-            item.classList.remove('selected');
-            item.removeEventListener('click', handleExerciseSelection);
-            item.style.cursor = '';
-        });
     }
 
-    function handleExerciseSelection(e) {
-        if (e.target.closest('button') || e.target.closest('.btn-group')) return;
+    toggleSelectionBtn.addEventListener('click', () => (selectionMode ? exitSelectionMode() : enterSelectionMode()));
+    cancelSelectionBtn.addEventListener('click', exitSelectionMode);
+    createSupersetBtn.addEventListener('click', function() {
+        const body = new FormData();
+        selected.forEach(id => body.append('exercise_ids[]', id));
+        change(`${baseUrl}/superset/create`, body, 'Superset created');
+    });
 
-        const exerciseId = this.dataset.exerciseId;
-        if (selectedExercises.has(exerciseId)) {
-            selectedExercises.delete(exerciseId);
-            this.classList.remove('selected');
-        } else {
-            selectedExercises.add(exerciseId);
-            this.classList.add('selected');
-        }
-        updateSelectedCount();
-    }
+    // ===== EXERCISE PICKER (server-side search, paged) =====
 
-    function updateSelectedCount() {
-        const count = selectedExercises.size;
-        selectedCountBadge.textContent = `${count} selected`;
-
-        if (count >= 2) {
-            createSupersetBtn.disabled = false;
-            selectedCountBadge.classList.remove('bg-secondary');
-            selectedCountBadge.classList.add('bg-success');
-        } else {
-            createSupersetBtn.disabled = true;
-            selectedCountBadge.classList.remove('bg-success');
-            selectedCountBadge.classList.add('bg-secondary');
-        }
-    }
-
-    if (toggleSelectionBtn) {
-        toggleSelectionBtn.addEventListener('click', function() {
-            selectionMode = !selectionMode;
-            if (selectionMode) enterSelectionMode();
-            else exitSelectionMode();
-        });
-    }
-
-    if (cancelSelectionBtn) {
-        cancelSelectionBtn.addEventListener('click', function() {
-            exitSelectionMode();
-        });
-    }
-
-    if (createSupersetBtn) {
-        createSupersetBtn.addEventListener('click', async function() {
-            if (selectedExercises.size < 2) return;
-
-            const formData = new FormData();
-            selectedExercises.forEach(id => {
-                formData.append('exercise_ids[]', id);
-            });
-
-            postAction(supersetUrl('create'), formData);
-        });
-    }
-
-    // ===== AJAX SEARCH AND FILTER =====
-
-    const exerciseSearch = document.getElementById('exercise-search');
+    const pickerEl = document.getElementById('exercise-picker');
+    const resultsEl = document.getElementById('exercise-list');
+    const searchInput = document.getElementById('exercise-search');
     const categoryFilter = document.getElementById('category-filter');
     const muscleFilter = document.getElementById('muscle-filter');
+    const moreButton = document.getElementById('picker-more');
+    const pickerCount = document.getElementById('picker-count');
+    let nextOffset = 0;
+    let requestNumber = 0;
+
+    function resultRow(exercise) {
+        const meta = [exercise.category_name, exercise.primary_muscles].filter(Boolean).join(' · ');
+        const name = gm.escapeHtml(exercise.name);
+        return `
+            <div class="picker-row">
+                <button type="button" class="picker-add add-exercise" data-exercise-id="${exercise.id}" data-exercise-name="${name}">
+                    <span class="picker-name">${name}</span>
+                    <span class="picker-meta">${gm.escapeHtml(meta)}</span>
+                </button>
+                <button type="button" class="btn btn-outline-secondary btn-touch view-exercise-details"
+                        data-exercise-id="${exercise.id}" data-exercise-name="${name}" aria-label="Instructions for ${name}">
+                    <i class="fa-solid fa-circle-info"></i>
+                </button>
+            </div>`;
+    }
+
+    async function loadExercises(reset) {
+        const mine = ++requestNumber;
+        const params = new URLSearchParams({
+            q: searchInput.value.trim(),
+            category: categoryFilter.value,
+            muscle: muscleFilter.value,
+            offset: reset ? 0 : nextOffset,
+        });
+        try {
+            const response = await fetch(`/exercises/picker?${params}`);
+            const data = await response.json();
+            if (mine !== requestNumber) return;  // a newer search superseded this one
+            if (reset) resultsEl.innerHTML = '';
+            resultsEl.insertAdjacentHTML('beforeend', data.exercises.map(resultRow).join(''));
+            nextOffset = data.next_offset;
+            moreButton.hidden = data.next_offset === null;
+            pickerCount.textContent = data.total === 0 ? 'No exercises match.' : `${data.total} exercises`;
+        } catch (error) {
+            pickerCount.textContent = 'Could not load exercises. Check your connection.';
+        }
+    }
 
     let searchTimeout;
+    searchInput.addEventListener('input', function() {
+        clearTimeout(searchTimeout);
+        searchTimeout = setTimeout(() => loadExercises(true), 250);
+    });
+    categoryFilter.addEventListener('change', () => loadExercises(true));
+    muscleFilter.addEventListener('change', () => loadExercises(true));
+    moreButton.addEventListener('click', () => loadExercises(false));
+    pickerEl.addEventListener('show.bs.offcanvas', () => { if (!resultsEl.children.length) loadExercises(true); });
 
-    if (exerciseSearch) {
-        exerciseSearch.addEventListener('input', function() {
-            clearTimeout(searchTimeout);
-            const query = this.value;
+    resultsEl.addEventListener('click', function(e) {
+        const button = e.target.closest('.add-exercise');
+        if (button) openTargetModal('add', button.dataset);
+    });
 
-            // If search is cleared, apply filters only (or reload)
-            if (query.length === 0) {
-                applyFilters();
-                return;
-            }
-
-            searchTimeout = setTimeout(async () => {
-                if (query.length < 2) return;
-
-                try {
-                    const response = await fetch(`/exercises/search?q=${encodeURIComponent(query)}`);
-                    const data = await response.json();
-                    updateExerciseList(data.exercises);
-                } catch (error) {
-                    console.error('Error searching exercises:', error);
-                }
-            }, 300);
-        });
-    }
-
-    if (categoryFilter) {
-        categoryFilter.addEventListener('change', applyFilters);
-    }
-    if (muscleFilter) {
-        muscleFilter.addEventListener('change', applyFilters);
-    }
-
-    async function applyFilters() {
-        const category = categoryFilter ? categoryFilter.value : '';
-        const muscle = muscleFilter ? muscleFilter.value : '';
-        const search = exerciseSearch ? exerciseSearch.value : '';
-
-        // If everything is cleared, reload to show original list
-        if (!category && !muscle && !search) {
-            location.reload();
-            return;
-        }
-
-        // If only search is active, let the search handler deal with it
-        if (search.length >= 2 && !category && !muscle) return;
-
-        try {
-            const params = new URLSearchParams();
-            if (category) params.append('category', category);
-            if (muscle) params.append('muscle', muscle);
-            if (search) params.append('q', search);
-            params.append('limit', 100);
-
-            const response = await fetch(`/exercises/filter?${params.toString()}`);
-            const data = await response.json();
-            updateExerciseList(data.exercises);
-        } catch (error) {
-            console.error('Error filtering exercises:', error);
-        }
-    }
-
-    function updateExerciseList(exercises) {
-        const listDiv = document.getElementById('exercise-list');
-        if (!listDiv) return;
-        listDiv.innerHTML = '';
-
-        exercises.forEach(exercise => {
-            const card = document.createElement('div');
-            card.className = 'card mb-2 exercise-item';
-
-            card.innerHTML = `
-                <div class="card-body p-2">
-                    <div class="d-flex justify-content-between align-items-start">
-                        <div class="flex-grow-1">
-                            <h6 class="mb-1">${exercise.name}</h6>
-                            <small class="text-muted d-block">${exercise.category_name || ''}</small>
-                        </div>
-                        <div class="btn-group">
-                            <button class="btn btn-sm btn-info btn-touch view-exercise-details"
-                                    data-exercise-id="${exercise.id}"
-                                    data-exercise-name="${exercise.name}"
-                                    title="View details">
-                                <i class="fa-solid fa-circle-info"></i>
-                            </button>
-                            <button class="btn btn-sm btn-primary btn-touch add-exercise"
-                                    data-exercise-id="${exercise.id}"
-                                    data-exercise-name="${exercise.name}"
-                                    title="Add to workout">
-                                <i class="fa-solid fa-plus"></i>
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            `;
-            listDiv.appendChild(card);
-        });
-    }
+    initSortable();
 });

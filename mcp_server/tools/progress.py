@@ -4,6 +4,7 @@ import json
 import sqlite3
 from typing import Optional
 
+from gymcore.sets import sets_for
 from mcp_server.auth import get_current_auth
 
 
@@ -21,12 +22,13 @@ def register_progress_tools(mcp, conn: sqlite3.Connection) -> None:
         Returns:
             JSON array of session dicts with workout_id, workout_name,
             scheduled_date, actual_sets, actual_reps, actual_weight,
-            actual_duration.
+            actual_duration (summary) and sets: the individual logged sets as
+            {set_number, reps, weight, duration, logged_at}.
         """
         auth = get_current_auth()
 
         rows = conn.execute(
-            """SELECT w.id AS workout_id, w.name AS workout_name,
+            """SELECT we.id AS workout_exercise_id, w.id AS workout_id, w.name AS workout_name,
                       w.scheduled_date, w.completed_at,
                       we.actual_sets, we.actual_reps, we.actual_weight, we.actual_duration,
                       we.target_sets, we.target_reps, we.target_weight
@@ -41,7 +43,12 @@ def register_progress_tools(mcp, conn: sqlite3.Connection) -> None:
             (exercise_id, auth.user_id, min(limit, 100)),
         ).fetchall()
 
-        return json.dumps([dict(r) for r in rows])
+        sessions = [dict(r) for r in rows]
+        by_entry = sets_for(conn, [s["workout_exercise_id"] for s in sessions])
+        for session in sessions:
+            session["sets"] = by_entry[session["workout_exercise_id"]]
+
+        return json.dumps(sessions)
 
     @mcp.tool()
     def get_workout_stats(

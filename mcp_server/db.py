@@ -11,6 +11,8 @@ if str(_PROJECT_ROOT) not in sys.path:
 
 from dotenv import load_dotenv
 
+from gymcore.db import connect
+
 load_dotenv(_PROJECT_ROOT / ".env")
 
 
@@ -23,11 +25,7 @@ def open_db() -> sqlite3.Connection:
     db_path = os.environ.get("DATABASE_PATH", str(_PROJECT_ROOT / "exercises.db"))
 
     try:
-        conn = sqlite3.connect(db_path, check_same_thread=False)
-        conn.row_factory = sqlite3.Row
-        conn.execute("PRAGMA foreign_keys = ON")
-        conn.execute("PRAGMA journal_mode = WAL")
-        return conn
+        return connect(db_path, check_same_thread=False)
     except Exception as exc:
         print(f"[mcp_server] Failed to open database at {db_path}: {exc}", file=sys.stderr)
         sys.exit(2)

@@ -1,63 +1,39 @@
 {% extends "base.html" %}
 
-{% block title %}Create Template - Gym Manager{% endblock %}
+{% block title %}New Template - Gym Manager{% endblock %}
 
 {% block content %}
 <div class="container">
-    <div class="row justify-content-center">
-        <div class="col-md-8 col-lg-6">
-            <div class="card shadow">
-                <div class="card-body">
-                    <h2 class="card-title mb-4">
-                        <i class="fa-solid fa-bookmark"></i> Create Workout Template
-                    </h2>
-
-                    <form method="POST">
-                        <div class="mb-3">
-                            <label for="name" class="form-label">Template Name *</label>
-                            <input type="text"
-                                   class="form-control form-control-lg"
-                                   id="name"
-                                   name="name"
-                                   placeholder="e.g., Upper Body, Leg Day, Full Body"
-                                   required>
-                        </div>
-
-                        <div class="mb-3">
-                            <label for="notes" class="form-label">Notes (optional)</label>
-                            <textarea class="form-control"
-                                      id="notes"
-                                      name="notes"
-                                      rows="3"
-                                      placeholder="Description of this template..."></textarea>
-                        </div>
-
-                        <div class="mb-3">
-                            <div class="form-check">
-                                <input class="form-check-input" type="checkbox" id="is_public" name="is_public">
-                                <label class="form-check-label" for="is_public">
-                                    <i class="fa-solid fa-globe"></i> Make this template public
-                                </label>
-                                <div class="form-text">
-                                    Public templates can be discovered and used by other users
-                                </div>
-                            </div>
-                        </div>
-
-                        <div class="alert alert-info">
-                            <i class="fa-solid fa-circle-info"></i> After creating the template, you'll be able to add exercises to it.
-                        </div>
-
-                        <div class="d-grid gap-2">
-                            <button type="submit" class="btn btn-primary btn-lg btn-touch">
-                                <i class="fa-solid fa-circle-check"></i> Create Template
-                            </button>
-                            <a href="{{ url_for('templates.list') }}" class="btn btn-secondary btn-lg btn-touch">Cancel</a>
-                        </div>
-                    </form>
-                </div>
-            </div>
-        </div>
+    <div class="page-header">
+        <h1>New template</h1>
     </div>
+
+    <form method="POST">
+        {{ csrf_field() }}
+        <div class="mb-3">
+            <label for="name" class="form-label">Name</label>
+            <input type="text" class="form-control form-control-lg" id="name" name="name"
+                   placeholder="e.g. Upper Body, Leg Day" required maxlength="100" autofocus>
+        </div>
+
+        <div class="mb-3">
+            <label for="notes" class="form-label">Notes <span class="text-muted fw-normal">(optional)</span></label>
+            <textarea class="form-control" id="notes" name="notes" rows="2"></textarea>
+        </div>
+
+        <div class="form-check mb-4">
+            <input class="form-check-input" type="checkbox" id="is_public" name="is_public">
+            <label class="form-check-label" for="is_public">
+                Public: other users can find and use it
+            </label>
+        </div>
+
+        <div class="d-grid gap-2">
+            <button type="submit" class="btn btn-primary btn-lg btn-touch">
+                <i class="fa-solid fa-arrow-right"></i> Create and add exercises
+            </button>
+            <a href="{{ url_for('templates.list') }}" class="btn btn-outline-secondary btn-touch">Cancel</a>
+        </div>
+    </form>
 </div>
 {% endblock %}

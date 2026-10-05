@@ -5,6 +5,8 @@ import requests
 from flask import session, current_app
 from datetime import datetime, time as dt_time
 from app.models import get_db
+from gymcore.db import now, parse_dt
+from gymcore.sets import describe_plan
 
 
 def generate_state_token(user_id):
@@ -89,7 +91,7 @@ def refresh_access_token(user_id, refresh_token):
             token_data['access_token'],
             token_data['refresh_token'],
             token_data['expires_at'],
-            datetime.now(),
+            now(),
             user_id
         ))
         db.commit()
@@ -121,38 +123,10 @@ def format_exercise_line(exercise, number_prefix):
     emoji = get_category_emoji(category_name)
     parts = [f"{number_prefix}.", emoji, exercise['exercise_name']]
 
-    # Use actual values if available, otherwise target values
-    sets = exercise.get('actual_sets') or exercise.get('target_sets')
-    reps = exercise.get('actual_reps') or exercise.get('target_reps')
-    weight = exercise.get('actual_weight') or exercise.get('target_weight')
-    duration = exercise.get('actual_duration') or exercise.get('target_duration')
-
-    if sets or reps or weight or duration:
-        details = []
-        if sets and reps:
-            details.append(f"{sets}x{reps}")
-        elif sets:
-            details.append(f"{sets} sets")
-        elif reps:
-            details.append(f"{reps} reps")
-
-        if weight:
-            details.append(f"@{weight}kg")
-
-        if duration:
-            # Format duration in seconds to a readable format
-            if duration >= 60:
-                mins = duration // 60
-                secs = duration % 60
-                if secs > 0:
-                    details.append(f"{mins}m{secs}s")
-                else:
-                    details.append(f"{mins}m")
-            else:
-                details.append(f"{duration}s")
-
-        if details:
-            parts.append(' '.join(details))
+    # What was actually done, set by set; the plan if nothing was logged
+    details = exercise.get('sets_text') or describe_plan(exercise)
+    if details:
+        parts.append(details)
 
     return ' '.join(parts)
 
@@ -242,35 +216,18 @@ def calculate_elapsed_time(workout):
         return int(workout.duration_minutes * 60)
 
     # Otherwise calculate from start/end times
-    if not workout.started_at or not workout.completed_at:
+    started = parse_dt(workout.started_at)
+    completed = parse_dt(workout.completed_at)
+    if not started or not completed:
         return 60  # Default to 1 minute if no time data
 
-    # Parse started_at
-    if isinstance(workout.started_at, str):
-        started = datetime.fromisoformat(workout.started_at)
-    else:
-        started = workout.started_at
-
-    # Parse completed_at
-    if isinstance(workout.completed_at, str):
-        completed = datetime.fromisoformat(workout.completed_at)
-    else:
-        completed = workout.completed_at
-
-    # Calculate elapsed time
-    elapsed = (completed - started).total_seconds()
-
     # Return duration in seconds (minimum 60 seconds)
-    return int(max(elapsed, 60))
+    return int(max((completed - started).total_seconds(), 60))
 
 
 def format_strava_datetime(workout):
     """Format workout start time for Strava API (ISO 8601)"""
-    # Parse started_at
-    if isinstance(workout.started_at, str):
-        dt = datetime.fromisoformat(workout.started_at)
-    else:
-        dt = workout.started_at
+    dt = parse_dt(workout.started_at)
 
     # Return ISO 8601 format (Strava expects local time without timezone)
     return dt.strftime('%Y-%m-%dT%H:%M:%S')

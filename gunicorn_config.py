@@ -11,11 +11,14 @@ bind = f"0.0.0.0:{os.environ.get('PORT', '8000')}"
 backlog = 2048
 
 # Worker processes
-workers = int(os.environ.get('GUNICORN_WORKERS', multiprocessing.cpu_count() * 2 + 1))
-worker_class = 'sync'
-worker_connections = 1000
-timeout = 30
-keepalive = 2
+# Threaded workers: the /mcp proxy holds a request open while it streams, which
+# would block a whole sync worker. SQLite handles the concurrency (WAL mode, one
+# connection per request), so a few workers with threads are plenty.
+workers = int(os.environ.get('GUNICORN_WORKERS', min(multiprocessing.cpu_count() * 2 + 1, 4)))
+worker_class = 'gthread'
+threads = int(os.environ.get('GUNICORN_THREADS', 8))
+timeout = 120
+keepalive = 5
 
 # Restart workers after this many requests (helps prevent memory leaks)
 max_requests = 1000

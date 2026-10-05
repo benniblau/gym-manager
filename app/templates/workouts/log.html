@@ -1,570 +1,185 @@
 {% extends "base.html" %}
 
-{% block title %}Log: {{ workout.name }} - Gym Manager{% endblock %}
+{% block title %}{{ workout.name }} - Gym Manager{% endblock %}
+{% block body_class %}has-actionbar no-tabbar{% endblock %}
+
+{% macro number(value) %}{% if value is not none %}{{ '%g' | format(value) }}{% endif %}{% endmacro %}
+
+{% macro log_exercise(exercise, label, in_superset=false, last_in_superset=true) %}
+<section class="log-ex" id="log-ex-{{ exercise.id }}"
+         data-entry-id="{{ exercise.id }}"
+         data-rest="{{ 'no' if in_superset and not last_in_superset else 'yes' }}">
+    <button type="button" class="log-ex-head" aria-expanded="false" aria-controls="log-body-{{ exercise.id }}">
+        <span class="summary-num">{{ label }}</span>
+        <span class="log-ex-title">
+            <span class="log-ex-name">{{ exercise.exercise_name }}</span>
+            <span class="log-ex-sub">{{ exercise | plan_text }}</span>
+        </span>
+        <span class="log-ex-progress" aria-live="polite"></span>
+        <i class="fa-solid fa-chevron-down log-ex-chevron"></i>
+    </button>
+    <div class="log-ex-body" id="log-body-{{ exercise.id }}" hidden>
+        {% if exercise.last %}
+            <p class="log-last"><i class="fa-solid fa-clock-rotate-left"></i> Last time ({{ exercise.last.date | nice_date }}): {{ exercise.last.text }}</p>
+        {% endif %}
+        {% if exercise.notes %}
+            <p class="log-last"><i class="fa-solid fa-note-sticky"></i> {{ exercise.notes }}</p>
+        {% endif %}
+
+        <div class="set-rows">
+            {% for row in exercise.rows %}
+            <div class="set-row {{ 'done' if row.done }}" data-set="{{ row.number }}">
+                <span class="set-num">{{ row.number }}</span>
+                {% if exercise.show_reps %}
+                <label class="set-field">
+                    <input type="number" inputmode="numeric" class="form-control set-input" data-field="reps"
+                           value="{{ number(row.reps) }}" min="0" max="999" aria-label="Reps, set {{ row.number }}">
+                    <span>reps</span>
+                </label>
+                {% endif %}
+                {% if exercise.show_weight %}
+                <label class="set-field">
+                    <input type="number" inputmode="decimal" class="form-control set-input" data-field="weight"
+                           value="{{ number(row.weight) }}" min="0" step="0.5" aria-label="Weight in kg, set {{ row.number }}">
+                    <span>kg</span>
+                </label>
+                {% endif %}
+                {% if exercise.show_duration %}
+                <label class="set-field">
+                    <input type="number" inputmode="numeric" class="form-control set-input" data-field="duration"
+                           value="{{ number(row.duration) }}" min="0" aria-label="Seconds, set {{ row.number }}">
+                    <span>sec</span>
+                </label>
+                {% endif %}
+                <button type="button" class="set-check" aria-pressed="{{ 'true' if row.done else 'false' }}"
+                        aria-label="Set {{ row.number }} done">
+                    <i class="fa-solid fa-check"></i>
+                </button>
+            </div>
+            {% endfor %}
+        </div>
+
+        <div class="d-flex gap-2 mt-2">
+            <button type="button" class="btn btn-outline-secondary btn-touch add-set">
+                <i class="fa-solid fa-plus"></i> Set
+            </button>
+            <button type="button" class="btn btn-outline-secondary btn-touch all-done flex-fill">
+                <i class="fa-solid fa-check-double"></i> All done
+            </button>
+            <button type="button" class="btn btn-outline-secondary btn-touch view-exercise-details"
+                    data-exercise-id="{{ exercise.exercise_id }}" data-exercise-name="{{ exercise.exercise_name }}"
+                    aria-label="Instructions for {{ exercise.exercise_name }}">
+                <i class="fa-solid fa-circle-info"></i>
+            </button>
+        </div>
+    </div>
+</section>
+{% endmacro %}
 
 {% block content %}
-<div class="container">
-    <div class="d-flex justify-content-between align-items-center mb-3">
-        <h2><i class="fa-solid fa-play"></i> {{ workout.name }}</h2>
-        <span class="badge bg-{{ 'success' if workout.status == 'completed' else ('warning' if workout.status == 'in_progress' else 'secondary') }} fs-6">
-            {{ workout.status }}
-        </span>
+<div class="container" id="log-page"
+     data-workout-id="{{ workout.id }}"
+     data-status="{{ workout.status }}">
+    <div class="page-header">
+        <h1>{{ workout.name }}</h1>
+        <div class="dropdown">
+            <button type="button" class="btn btn-outline-secondary btn-touch" data-bs-toggle="dropdown" aria-expanded="false" aria-label="Logging options">
+                <i class="fa-solid fa-stopwatch"></i> <span id="rest-setting-label"></span>
+            </button>
+            <ul class="dropdown-menu dropdown-menu-end action-menu" id="rest-options">
+                <li><h6 class="dropdown-header">Rest timer after each set</h6></li>
+                {% for seconds, text in [(0, 'Off'), (45, '45 s'), (60, '1 min'), (90, '1:30 min'), (120, '2 min'), (180, '3 min')] %}
+                    <li><button type="button" class="dropdown-item" data-rest-seconds="{{ seconds }}">{{ text }}</button></li>
+                {% endfor %}
+            </ul>
+        </div>
     </div>
 
-    {% if workout.status == 'completed' %}
-        <div class="alert alert-success">
-            <i class="fa-solid fa-circle-check"></i> This workout is completed!
-        </div>
-    {% endif %}
-
     {% if not exercises %}
-        <div class="alert alert-warning">
-            <h5><i class="fa-solid fa-triangle-exclamation"></i> No exercises in this workout</h5>
-            <p class="mb-0">
-                <a href="{{ url_for('workouts.edit', workout_id=workout.id) }}" class="alert-link">Add some exercises first</a>
-            </p>
-        </div>
+        <p class="text-muted">
+            This workout has no exercises yet.
+            <a href="{{ url_for('workouts.edit', workout_id=workout.id) }}">Add some first</a>.
+        </p>
     {% else %}
-        <!-- Progress indicator -->
-        <div class="mb-3">
-            <small class="text-muted">Exercise {{ exercises|length }} total</small>
-            <div class="progress progress-thin">
-                <div class="progress-bar bg-success" role="progressbar" style="width: 0%" id="progress-bar"></div>
+        <div class="progress progress-thin mb-3" role="progressbar" aria-label="Workout progress" aria-valuemin="0" aria-valuemax="{{ exercises|length }}">
+            <div class="progress-bar bg-success" id="progress-bar" style="width: 0%"></div>
+        </div>
+
+        {% set ns = namespace(num=1) %}
+        {% for block in blocks %}
+            {% if block.superset_id %}
+                {% set first = block.exercises[0] %}
+                <div class="superset-group" data-superset-id="{{ block.superset_id }}">
+                    <div class="superset-header">
+                        <span class="superset-label">
+                            <i class="fa-solid fa-layer-group"></i> Superset · no rest between exercises
+                        </span>
+                        <label class="superset-rounds">
+                            <span>Rounds{% if first.superset_target_reps %} (plan {{ first.superset_target_reps }}){% endif %}</span>
+                            <input type="number" inputmode="numeric" class="form-control superset-rounds-input"
+                                   data-superset-id="{{ block.superset_id }}"
+                                   value="{{ first.superset_actual_reps or '' }}" min="0" max="99"
+                                   placeholder="{{ first.superset_target_reps or '–' }}">
+                        </label>
+                    </div>
+                    {% for exercise in block.exercises %}
+                        {{ log_exercise(exercise, ns.num ~ 'abcdefghijklmnopqrstuvwxyz'[loop.index0], true, loop.last) }}
+                    {% endfor %}
+                </div>
+            {% else %}
+                {{ log_exercise(block.exercises[0], ns.num) }}
+            {% endif %}
+            {% set ns.num = ns.num + 1 %}
+        {% endfor %}
+    {% endif %}
+</div>
+
+<!-- Sticky bar: save state, rest timer, finish -->
+<div class="action-bar">
+    <div class="action-bar-inner">
+        <div class="log-status">
+            <div class="log-status-progress"><span id="progress-text">0</span> of {{ exercises|length }} done</div>
+            <div class="log-status-sync" id="sync-status" aria-live="polite"><i class="fa-solid fa-cloud"></i> Saved</div>
+        </div>
+        <button type="button" class="rest-chip" id="rest-chip" hidden aria-label="Rest timer. Tap to skip.">
+            <i class="fa-solid fa-hourglass-half"></i> <span id="rest-time">0:00</span>
+        </button>
+        {% if workout.status == 'completed' %}
+            <a href="{{ url_for('workouts.detail', workout_id=workout.id) }}" class="btn btn-success btn-lg btn-touch" id="leave-btn">
+                <i class="fa-solid fa-check"></i> Done
+            </a>
+        {% else %}
+            <button type="button" class="btn btn-success btn-lg btn-touch" id="finish-btn">
+                <i class="fa-solid fa-flag-checkered"></i> Finish
+            </button>
+        {% endif %}
+    </div>
+</div>
+
+<form method="POST" action="{{ url_for('workouts.complete', workout_id=workout.id) }}" id="finish-form" hidden>
+    {{ csrf_field() }}
+</form>
+
+<!-- Finish dialog when some exercises were not logged -->
+<div class="modal fade" id="finish-modal" tabindex="-1" aria-labelledby="finish-modal-title" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-body py-4">
+                <h5 id="finish-modal-title">Finish workout?</h5>
+                <p class="text-muted" id="finish-modal-text"></p>
+                <div class="d-grid gap-2">
+                    <button type="button" class="btn btn-success btn-touch" data-finish="shown">Log them as shown and finish</button>
+                    <button type="button" class="btn btn-outline-secondary btn-touch" data-finish="">Finish without them</button>
+                    <button type="button" class="btn btn-outline-secondary btn-touch" data-bs-dismiss="modal">Keep logging</button>
+                </div>
             </div>
         </div>
-
-        <!-- Exercise cards -->
-        <form method="POST" id="workout-form">
-            {# Group exercises by superset_group_id #}
-            {% set ns = namespace(display_num=1, processed_groups=[]) %}
-            {% for exercise in exercises %}
-                {% if exercise.superset_group_id %}
-                    {# Check if we already processed this superset group #}
-                    {% if exercise.superset_group_id not in ns.processed_groups %}
-                        {% set ns.processed_groups = ns.processed_groups + [exercise.superset_group_id] %}
-                        {# Collect all exercises in this superset #}
-                        {% set superset_exercises = exercises|selectattr('superset_group_id', 'equalto', exercise.superset_group_id)|list %}
-
-                        {# Render superset group container #}
-                        {% set superset_target_reps = superset_exercises[0].superset_target_reps if superset_exercises else None %}
-                        {% set superset_actual_reps = superset_exercises[0].superset_actual_reps if superset_exercises else None %}
-                        <div class="superset-group mb-3" data-superset-id="{{ exercise.superset_group_id }}">
-                            <div class="superset-header d-flex flex-wrap align-items-center justify-content-between">
-                                <span class="superset-label">
-                                    <i class="fa-solid fa-layer-group"></i> Superset
-                                    {% if superset_target_reps %}<small class="text-muted">(Target: {{ superset_target_reps }} rounds)</small>{% endif %}
-                                </span>
-                                <div class="superset-rounds-log d-flex align-items-center">
-                                    <label class="me-2 small fw-bold">Rounds:</label>
-                                    <div class="input-group input-group-sm" style="width: 120px;">
-                                        <button type="button" class="btn btn-outline-secondary btn-touch superset-stepper-minus" data-superset-id="{{ exercise.superset_group_id }}">
-                                            <i class="fa-solid fa-minus"></i>
-                                        </button>
-                                        <input type="number"
-                                               inputmode="numeric"
-                                               pattern="[0-9]*"
-                                               class="form-control text-center superset-rounds-input"
-                                               data-superset-id="{{ exercise.superset_group_id }}"
-                                               value="{{ superset_actual_reps or superset_target_reps or '' }}"
-                                               min="1" max="99"
-                                               placeholder="{{ superset_target_reps or '—' }}">
-                                        <button type="button" class="btn btn-outline-secondary btn-touch superset-stepper-plus" data-superset-id="{{ exercise.superset_group_id }}">
-                                            <i class="fa-solid fa-plus"></i>
-                                        </button>
-                                    </div>
-                                </div>
-                            </div>
-                            <small class="text-muted d-block mt-1"><i class="fa-solid fa-bolt"></i> No rest between exercises</small>
-
-                            {# Render exercises in this superset #}
-                            {% for ss_exercise in superset_exercises %}
-                                {% set letter = 'abcdefghijklmnopqrstuvwxyz'[loop.index0] %}
-                                <div class="card exercise-log-card mb-2 shadow-sm">
-                                    <div class="card-header" style="background-color: #7a09b3; color: white;">
-                                        <h5 class="mb-0">
-                                            <span class="badge bg-light text-dark me-2">{{ ns.display_num }}{{ letter }}</span>
-                                            {{ ss_exercise.exercise_name }}
-                                        </h5>
-                                        {% if ss_exercise.target_sets or ss_exercise.target_reps or ss_exercise.target_weight or ss_exercise.target_duration %}
-                                            <small>
-                                                Target:
-                                                {% if ss_exercise.target_sets %}{{ ss_exercise.target_sets }} sets{% endif %}
-                                                {% if ss_exercise.target_reps %} × {{ ss_exercise.target_reps }} reps{% endif %}
-                                                {% if ss_exercise.target_weight %} @ {{ ss_exercise.target_weight }} kg{% endif %}
-                                                {% if ss_exercise.target_duration %} • {{ ss_exercise.target_duration }}s{% endif %}
-                                            </small>
-                                        {% endif %}
-                                    </div>
-                                    <div class="card-body">
-                                        <!-- Exercise metadata badges -->
-                                        <div class="exercise-log-meta mb-3">
-                                            {% if ss_exercise.category_name %}
-                                                <span class="badge badge-category">{{ ss_exercise.category_name }}</span>
-                                            {% endif %}
-                                            {% if ss_exercise.primary_muscles %}
-                                                <span class="badge badge-muscle-primary">
-                                                    <i class="fa-solid fa-heart-pulse"></i> {{ ss_exercise.primary_muscles }}
-                                                </span>
-                                            {% endif %}
-                                        </div>
-                                        <div class="row g-3">
-                                            <!-- Sets input -->
-                                            <div class="col-6 col-md-3">
-                                                <label for="sets_{{ ss_exercise.id }}" class="form-label fw-bold">Sets</label>
-                                                <div class="input-group input-group-stepper">
-                                                    <button type="button" class="btn btn-outline-secondary btn-touch stepper-minus" data-target="sets_{{ ss_exercise.id }}">
-                                                        <i class="fa-solid fa-minus"></i>
-                                                    </button>
-                                                    <input type="number"
-                                                           inputmode="numeric"
-                                                           pattern="[0-9]*"
-                                                           class="form-control form-control-lg text-center auto-save"
-                                                           id="sets_{{ ss_exercise.id }}"
-                                                           name="sets_{{ ss_exercise.id }}"
-                                                           value="{{ ss_exercise.actual_sets or ss_exercise.target_sets or '' }}"
-                                                           min="0" max="99"
-                                                           data-exercise-id="{{ ss_exercise.id }}"
-                                                           data-field="actual_sets"
-                                                           placeholder="{{ ss_exercise.target_sets or '' }}">
-                                                    <button type="button" class="btn btn-outline-secondary btn-touch stepper-plus" data-target="sets_{{ ss_exercise.id }}">
-                                                        <i class="fa-solid fa-plus"></i>
-                                                    </button>
-                                                </div>
-                                            </div>
-
-                                            <!-- Reps input -->
-                                            <div class="col-6 col-md-3">
-                                                <label for="reps_{{ ss_exercise.id }}" class="form-label fw-bold">Reps</label>
-                                                <div class="input-group input-group-stepper">
-                                                    <button type="button" class="btn btn-outline-secondary btn-touch stepper-minus" data-target="reps_{{ ss_exercise.id }}">
-                                                        <i class="fa-solid fa-minus"></i>
-                                                    </button>
-                                                    <input type="number"
-                                                           inputmode="numeric"
-                                                           pattern="[0-9]*"
-                                                           class="form-control form-control-lg text-center auto-save"
-                                                           id="reps_{{ ss_exercise.id }}"
-                                                           name="reps_{{ ss_exercise.id }}"
-                                                           value="{{ ss_exercise.actual_reps or ss_exercise.target_reps or '' }}"
-                                                           min="0" max="999"
-                                                           data-exercise-id="{{ ss_exercise.id }}"
-                                                           data-field="actual_reps"
-                                                           placeholder="{{ ss_exercise.target_reps or '' }}">
-                                                    <button type="button" class="btn btn-outline-secondary btn-touch stepper-plus" data-target="reps_{{ ss_exercise.id }}">
-                                                        <i class="fa-solid fa-plus"></i>
-                                                    </button>
-                                                </div>
-                                            </div>
-
-                                            <!-- Weight input -->
-                                            <div class="col-6 col-md-3">
-                                                <label for="weight_{{ ss_exercise.id }}" class="form-label fw-bold">Weight (kg)</label>
-                                                <div class="input-group input-group-stepper">
-                                                    <button type="button" class="btn btn-outline-secondary btn-touch stepper-minus" data-target="weight_{{ ss_exercise.id }}" data-step="5">
-                                                        <i class="fa-solid fa-minus"></i>
-                                                    </button>
-                                                    <input type="number"
-                                                           inputmode="decimal"
-                                                           class="form-control form-control-lg text-center auto-save"
-                                                           id="weight_{{ ss_exercise.id }}"
-                                                           name="weight_{{ ss_exercise.id }}"
-                                                           value="{{ ss_exercise.actual_weight or ss_exercise.target_weight or '' }}"
-                                                           min="0" step="0.5"
-                                                           data-exercise-id="{{ ss_exercise.id }}"
-                                                           data-field="actual_weight"
-                                                           placeholder="{{ ss_exercise.target_weight or '' }}">
-                                                    <button type="button" class="btn btn-outline-secondary btn-touch stepper-plus" data-target="weight_{{ ss_exercise.id }}" data-step="5">
-                                                        <i class="fa-solid fa-plus"></i>
-                                                    </button>
-                                                </div>
-                                            </div>
-
-                                            <!-- Duration input -->
-                                            <div class="col-6 col-md-3">
-                                                <label for="duration_{{ ss_exercise.id }}" class="form-label fw-bold">Duration (s)</label>
-                                                <div class="input-group input-group-stepper">
-                                                    <button type="button" class="btn btn-outline-secondary btn-touch stepper-minus" data-target="duration_{{ ss_exercise.id }}" data-step="5">
-                                                        <i class="fa-solid fa-minus"></i>
-                                                    </button>
-                                                    <input type="number"
-                                                           inputmode="numeric"
-                                                           pattern="[0-9]*"
-                                                           class="form-control form-control-lg text-center auto-save"
-                                                           id="duration_{{ ss_exercise.id }}"
-                                                           name="duration_{{ ss_exercise.id }}"
-                                                           value="{{ ss_exercise.actual_duration or ss_exercise.target_duration or '' }}"
-                                                           min="0" step="5"
-                                                           data-exercise-id="{{ ss_exercise.id }}"
-                                                           data-field="actual_duration"
-                                                           placeholder="{{ ss_exercise.target_duration or '' }}">
-                                                    <button type="button" class="btn btn-outline-secondary btn-touch stepper-plus" data-target="duration_{{ ss_exercise.id }}" data-step="5">
-                                                        <i class="fa-solid fa-plus"></i>
-                                                    </button>
-                                                </div>
-                                            </div>
-                                        </div>
-
-                                        <!-- Save indicator -->
-                                        <div class="text-center mt-2">
-                                            <small class="text-muted save-status" id="status-{{ ss_exercise.id }}">
-                                                <i class="fa-solid fa-cloud-arrow-up text-success"></i> Auto-save enabled
-                                            </small>
-                                        </div>
-
-                                        <!-- Exercise info links -->
-                                        <div class="mt-2 d-flex gap-2">
-                                            <button type="button"
-                                                    class="btn btn-sm btn-outline-info flex-fill view-exercise-details"
-                                                    data-exercise-id="{{ ss_exercise.exercise_id }}"
-                                                    data-exercise-name="{{ ss_exercise.exercise_name }}">
-                                                <i class="fa-solid fa-circle-info"></i> Instructions
-                                            </button>
-                                            <a href="{{ ss_exercise.exercise_name | exercem_url }}"
-                                               class="btn btn-sm btn-outline-success flex-fill"
-                                               target="_blank">
-                                                <i class="fa-solid fa-link"></i> exercem.us
-                                            </a>
-                                        </div>
-                                    </div>
-                                </div>
-                                {% if not loop.last %}
-                                <div class="superset-indicator">
-                                    <i class="fa-solid fa-bolt"></i> No rest - continue immediately
-                                </div>
-                                {% endif %}
-                            {% endfor %}
-                        </div>
-                        {% set ns.display_num = ns.display_num + 1 %}
-                    {% endif %}
-                {% else %}
-                    {# Standalone exercise #}
-                    <div class="card exercise-log-card mb-3 shadow">
-                        <div class="card-header bg-primary text-white">
-                            <h5 class="mb-0">
-                                <span class="badge bg-light text-dark me-2">{{ ns.display_num }}</span>
-                                {{ exercise.exercise_name }}
-                            </h5>
-                            {% if exercise.target_sets or exercise.target_reps or exercise.target_weight or exercise.target_duration %}
-                                <small>
-                                    Target:
-                                    {% if exercise.target_sets %}{{ exercise.target_sets }} sets{% endif %}
-                                    {% if exercise.target_reps %} × {{ exercise.target_reps }} reps{% endif %}
-                                    {% if exercise.target_weight %} @ {{ exercise.target_weight }} kg{% endif %}
-                                    {% if exercise.target_duration %} • {{ exercise.target_duration }}s{% endif %}
-                                </small>
-                            {% endif %}
-                        </div>
-                        <div class="card-body">
-                            <!-- Exercise metadata badges -->
-                            <div class="exercise-log-meta mb-3">
-                                {% if exercise.category_name %}
-                                    <span class="badge badge-category">{{ exercise.category_name }}</span>
-                                {% endif %}
-                                {% if exercise.primary_muscles %}
-                                    <span class="badge badge-muscle-primary">
-                                        <i class="fa-solid fa-heart-pulse"></i> {{ exercise.primary_muscles }}
-                                    </span>
-                                {% endif %}
-                            </div>
-                            <div class="row g-3">
-                                <!-- Sets input -->
-                                <div class="col-6 col-md-3">
-                                    <label for="sets_{{ exercise.id }}" class="form-label fw-bold">Sets</label>
-                                    <div class="input-group input-group-stepper">
-                                        <button type="button" class="btn btn-outline-secondary btn-touch stepper-minus" data-target="sets_{{ exercise.id }}">
-                                            <i class="fa-solid fa-minus"></i>
-                                        </button>
-                                        <input type="number"
-                                               inputmode="numeric"
-                                               pattern="[0-9]*"
-                                               class="form-control form-control-lg text-center auto-save"
-                                               id="sets_{{ exercise.id }}"
-                                               name="sets_{{ exercise.id }}"
-                                               value="{{ exercise.actual_sets or exercise.target_sets or '' }}"
-                                               min="0" max="99"
-                                               data-exercise-id="{{ exercise.id }}"
-                                               data-field="actual_sets"
-                                               placeholder="{{ exercise.target_sets or '' }}">
-                                        <button type="button" class="btn btn-outline-secondary btn-touch stepper-plus" data-target="sets_{{ exercise.id }}">
-                                            <i class="fa-solid fa-plus"></i>
-                                        </button>
-                                    </div>
-                                </div>
-
-                                <!-- Reps input -->
-                                <div class="col-6 col-md-3">
-                                    <label for="reps_{{ exercise.id }}" class="form-label fw-bold">Reps</label>
-                                    <div class="input-group input-group-stepper">
-                                        <button type="button" class="btn btn-outline-secondary btn-touch stepper-minus" data-target="reps_{{ exercise.id }}">
-                                            <i class="fa-solid fa-minus"></i>
-                                        </button>
-                                        <input type="number"
-                                               inputmode="numeric"
-                                               pattern="[0-9]*"
-                                               class="form-control form-control-lg text-center auto-save"
-                                               id="reps_{{ exercise.id }}"
-                                               name="reps_{{ exercise.id }}"
-                                               value="{{ exercise.actual_reps or exercise.target_reps or '' }}"
-                                               min="0" max="999"
-                                               data-exercise-id="{{ exercise.id }}"
-                                               data-field="actual_reps"
-                                               placeholder="{{ exercise.target_reps or '' }}">
-                                        <button type="button" class="btn btn-outline-secondary btn-touch stepper-plus" data-target="reps_{{ exercise.id }}">
-                                            <i class="fa-solid fa-plus"></i>
-                                        </button>
-                                    </div>
-                                </div>
-
-                                <!-- Weight input -->
-                                <div class="col-6 col-md-3">
-                                    <label for="weight_{{ exercise.id }}" class="form-label fw-bold">Weight (kg)</label>
-                                    <div class="input-group input-group-stepper">
-                                        <button type="button" class="btn btn-outline-secondary btn-touch stepper-minus" data-target="weight_{{ exercise.id }}" data-step="5">
-                                            <i class="fa-solid fa-minus"></i>
-                                        </button>
-                                        <input type="number"
-                                               inputmode="decimal"
-                                               class="form-control form-control-lg text-center auto-save"
-                                               id="weight_{{ exercise.id }}"
-                                               name="weight_{{ exercise.id }}"
-                                               value="{{ exercise.actual_weight or exercise.target_weight or '' }}"
-                                               min="0" step="0.5"
-                                               data-exercise-id="{{ exercise.id }}"
-                                               data-field="actual_weight"
-                                               placeholder="{{ exercise.target_weight or '' }}">
-                                        <button type="button" class="btn btn-outline-secondary btn-touch stepper-plus" data-target="weight_{{ exercise.id }}" data-step="5">
-                                            <i class="fa-solid fa-plus"></i>
-                                        </button>
-                                    </div>
-                                </div>
-
-                                <!-- Duration input -->
-                                <div class="col-6 col-md-3">
-                                    <label for="duration_{{ exercise.id }}" class="form-label fw-bold">Duration (s)</label>
-                                    <div class="input-group input-group-stepper">
-                                        <button type="button" class="btn btn-outline-secondary btn-touch stepper-minus" data-target="duration_{{ exercise.id }}" data-step="5">
-                                            <i class="fa-solid fa-minus"></i>
-                                        </button>
-                                        <input type="number"
-                                               inputmode="numeric"
-                                               pattern="[0-9]*"
-                                               class="form-control form-control-lg text-center auto-save"
-                                               id="duration_{{ exercise.id }}"
-                                               name="duration_{{ exercise.id }}"
-                                               value="{{ exercise.actual_duration or exercise.target_duration or '' }}"
-                                               min="0" step="5"
-                                               data-exercise-id="{{ exercise.id }}"
-                                               data-field="actual_duration"
-                                               placeholder="{{ exercise.target_duration or '' }}">
-                                        <button type="button" class="btn btn-outline-secondary btn-touch stepper-plus" data-target="duration_{{ exercise.id }}" data-step="5">
-                                            <i class="fa-solid fa-plus"></i>
-                                        </button>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <!-- Save indicator -->
-                            <div class="text-center mt-2">
-                                <small class="text-muted save-status" id="status-{{ exercise.id }}">
-                                    <i class="fa-solid fa-cloud-arrow-up text-success"></i> Auto-save enabled
-                                </small>
-                            </div>
-
-                            <!-- Exercise info links -->
-                            <div class="mt-2 d-flex gap-2">
-                                <button type="button"
-                                        class="btn btn-sm btn-outline-info flex-fill view-exercise-details"
-                                        data-exercise-id="{{ exercise.exercise_id }}"
-                                        data-exercise-name="{{ exercise.exercise_name }}">
-                                    <i class="fa-solid fa-circle-info"></i> Instructions
-                                </button>
-                                <a href="{{ exercise.exercise_name | exercem_url }}"
-                                   class="btn btn-sm btn-outline-success flex-fill"
-                                   target="_blank">
-                                    <i class="fa-solid fa-link"></i> exercem.us
-                                </a>
-                            </div>
-                        </div>
-                    </div>
-                    {% set ns.display_num = ns.display_num + 1 %}
-                {% endif %}
-            {% endfor %}
-        </form>
-
-        <!-- Action buttons -->
-        <div class="d-grid gap-2 mb-4">
-            {% if workout.status != 'completed' %}
-                <form method="POST" action="{{ url_for('workouts.complete', workout_id=workout.id) }}">
-                    <button type="submit" class="btn btn-success btn-lg btn-touch w-100">
-                        <i class="fa-solid fa-circle-check"></i> Complete Workout
-                    </button>
-                </form>
-            {% endif %}
-            <a href="{{ url_for('workouts.detail', workout_id=workout.id) }}" class="btn btn-outline-secondary btn-lg btn-touch">
-                <i class="fa-solid fa-arrow-left"></i> Back to Workout
-            </a>
-        </div>
-    {% endif %}
+    </div>
 </div>
 
 {% include 'includes/exercise_details_modal.html' %}
 {% endblock %}
 
 {% block extra_js %}
-<script>
-document.addEventListener('DOMContentLoaded', function() {
-    // Stepper button functionality
-    document.querySelectorAll('.stepper-minus, .stepper-plus').forEach(function(button) {
-        button.addEventListener('click', function() {
-            const targetId = this.getAttribute('data-target');
-            const input = document.getElementById(targetId);
-            if (!input) return;
-
-            const step = parseFloat(this.getAttribute('data-step')) || 1;
-            const min = parseFloat(input.getAttribute('min')) || 0;
-            const max = parseFloat(input.getAttribute('max')) || 999;
-            let value = parseFloat(input.value) || 0;
-
-            if (this.classList.contains('stepper-plus')) {
-                value = Math.min(value + step, max);
-            } else {
-                value = Math.max(value - step, min);
-            }
-
-            input.value = value;
-
-            // Trigger auto-save
-            input.dispatchEvent(new Event('change', { bubbles: true }));
-        });
-    });
-
-    // Auto-save functionality
-    let saveTimeout;
-    document.querySelectorAll('.auto-save').forEach(function(input) {
-        input.addEventListener('change', function() {
-            const exerciseId = this.getAttribute('data-exercise-id');
-            const field = this.getAttribute('data-field');
-            const value = this.value;
-            const statusEl = document.getElementById('status-' + exerciseId);
-
-            // Show saving indicator
-            if (statusEl) {
-                statusEl.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Saving...';
-            }
-
-            // Debounce saves
-            clearTimeout(saveTimeout);
-            saveTimeout = setTimeout(function() {
-                // Collect all values for this exercise
-                const setsInput = document.querySelector(`[data-exercise-id="${exerciseId}"][data-field="actual_sets"]`);
-                const repsInput = document.querySelector(`[data-exercise-id="${exerciseId}"][data-field="actual_reps"]`);
-                const weightInput = document.querySelector(`[data-exercise-id="${exerciseId}"][data-field="actual_weight"]`);
-                const durationInput = document.querySelector(`[data-exercise-id="${exerciseId}"][data-field="actual_duration"]`);
-
-                const formData = new FormData();
-                if (setsInput && setsInput.value) formData.append('actual_sets', setsInput.value);
-                if (repsInput && repsInput.value) formData.append('actual_reps', repsInput.value);
-                if (weightInput && weightInput.value) formData.append('actual_weight', weightInput.value);
-                if (durationInput && durationInput.value) formData.append('actual_duration', durationInput.value);
-
-                fetch(`/workouts/{{ workout.id }}/exercises/${exerciseId}/update`, {
-                    method: 'POST',
-                    body: formData
-                })
-                .then(response => response.json())
-                .then(data => {
-                    if (statusEl) {
-                        if (data.success) {
-                            statusEl.innerHTML = '<i class="fa-solid fa-circle-check text-success"></i> Saved!';
-                            setTimeout(() => {
-                                statusEl.innerHTML = '<i class="fa-solid fa-cloud-arrow-up text-success"></i> Auto-save enabled';
-                            }, 2000);
-                        } else {
-                            statusEl.innerHTML = '<i class="fa-solid fa-triangle-exclamation text-danger"></i> Save failed';
-                        }
-                    }
-                    updateProgress();
-                })
-                .catch(error => {
-                    if (statusEl) {
-                        statusEl.innerHTML = '<i class="fa-solid fa-triangle-exclamation text-danger"></i> Save failed';
-                    }
-                });
-            }, 300);
-        });
-    });
-
-    // Update progress bar
-    function updateProgress() {
-        const inputs = document.querySelectorAll('.auto-save');
-        let filled = 0;
-        let total = 0;
-
-        // Count unique exercises (by checking sets field only)
-        const exercises = document.querySelectorAll('[data-field="actual_sets"]');
-        exercises.forEach(function(input) {
-            total++;
-            if (input.value && parseFloat(input.value) > 0) {
-                filled++;
-            }
-        });
-
-        const progress = total > 0 ? (filled / total) * 100 : 0;
-        const progressBar = document.getElementById('progress-bar');
-        if (progressBar) {
-            progressBar.style.width = progress + '%';
-        }
-    }
-
-    // Initial progress update
-    updateProgress();
-
-    // Superset rounds stepper buttons
-    document.querySelectorAll('.superset-stepper-minus, .superset-stepper-plus').forEach(function(button) {
-        button.addEventListener('click', function() {
-            const supersetId = this.getAttribute('data-superset-id');
-            const input = document.querySelector(`.superset-rounds-input[data-superset-id="${supersetId}"]`);
-            if (!input) return;
-
-            let value = parseInt(input.value) || 0;
-
-            if (this.classList.contains('superset-stepper-plus')) {
-                value = Math.min(value + 1, 99);
-            } else {
-                value = Math.max(value - 1, 1);
-            }
-
-            input.value = value;
-            input.dispatchEvent(new Event('change', { bubbles: true }));
-        });
-    });
-
-    // Superset rounds auto-save
-    document.querySelectorAll('.superset-rounds-input').forEach(function(input) {
-        input.addEventListener('change', function() {
-            const supersetId = this.getAttribute('data-superset-id');
-            const value = this.value;
-
-            const formData = new FormData();
-            if (value) {
-                formData.append('actual_reps', value);
-            }
-
-            fetch(`/workouts/{{ workout.id }}/superset/${supersetId}/update-reps`, {
-                method: 'POST',
-                body: formData
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (!data.success) {
-                    console.error('Failed to save superset rounds:', data.error);
-                }
-            })
-            .catch(error => {
-                console.error('Error saving superset rounds:', error);
-            });
-        });
-    });
-});
-</script>
+<script src="{{ url_for('static', filename='js/workout-log.js') }}"></script>
 {% endblock %}

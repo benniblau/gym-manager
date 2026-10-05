@@ -17,7 +17,6 @@ Environment=FLASK_ENV=production
 
 ExecStart=/opt/gym-manager/venv/bin/gunicorn \
     --config gunicorn_config.py \
-    --worker-class sync \
     wsgi:app
 
 # Restart policy

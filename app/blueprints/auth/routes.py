@@ -68,7 +68,7 @@ def login():
     return render_template('auth/login.html', form=form)
 
 
-@auth_bp.route('/logout')
+@auth_bp.route('/logout', methods=['POST'])
 @login_required
 def logout():
     """User logout"""
@@ -88,13 +88,10 @@ def settings():
     # Get Strava connection info
     strava_connection = StravaConnection.get_by_user_id(current_user.id)
 
-    # Pre-populate Strava form if connection exists
+    # Tokens are never sent back to the browser; only the non-secret fields are pre-filled
     if strava_connection:
-        strava_form.access_token.data = strava_connection.get('access_token', '')
-        strava_form.refresh_token.data = strava_connection.get('refresh_token', '')
-        strava_form.expires_at.data = str(strava_connection.get('expires_at', ''))
-        strava_form.athlete_id.data = str(strava_connection.get('athlete_id', '')) if strava_connection.get('athlete_id') else ''
-        strava_form.athlete_username.data = strava_connection.get('athlete_username', '')
+        strava_form.athlete_id.data = str(strava_connection.get('athlete_id') or '')
+        strava_form.athlete_username.data = strava_connection.get('athlete_username') or ''
 
     api_keys = ApiKeyRepository(get_db()).get_keys_for_user(current_user.id)
     new_api_key = session.pop('new_api_key', None)

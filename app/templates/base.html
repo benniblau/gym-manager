@@ -2,122 +2,144 @@
 <html lang="en" data-bs-theme="dark">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <meta name="csrf-token" content="{{ csrf_token() }}">
+    <meta name="theme-color" content="#16171b">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="ARISE">
     <title>{% block title %}Gym Manager{% endblock %}</title>
 
-    <!-- Bootstrap 5.3+ CSS (includes dark theme) -->
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
-
-    <!-- ARISE Brand Color Overrides - see custom.css for full color system -->
+    <link href="{{ url_for('static', filename='vendor/bootstrap.min.css') }}" rel="stylesheet">
 
     <!-- FontAwesome Free -->
     <link href="{{ url_for('static', filename='fontawesome/css/fontawesome.min.css') }}" rel="stylesheet">
     <link href="{{ url_for('static', filename='fontawesome/css/solid.min.css') }}" rel="stylesheet">
     <link href="{{ url_for('static', filename='fontawesome/css/brands.min.css') }}" rel="stylesheet">
 
-    <!-- Custom CSS -->
+    <!-- Custom CSS (ARISE color system and components) -->
     <link href="{{ url_for('static', filename='css/custom.css') }}" rel="stylesheet">
 
     <!-- Favicons -->
     <link rel="apple-touch-icon" sizes="180x180" href="{{ url_for('static', filename='fav/apple-touch-icon.png') }}">
     <link rel="icon" type="image/png" sizes="32x32" href="{{ url_for('static', filename='fav/favicon-32x32.png') }}">
     <link rel="icon" type="image/png" sizes="16x16" href="{{ url_for('static', filename='fav/favicon-16x16.png') }}">
-    <link rel="manifest" href="{{ url_for('static', filename='fav/site.webmanifest') }}">
-    
+    <link rel="manifest" href="{{ url_for('main.manifest') }}">
+
     {% block extra_css %}{% endblock %}
 </head>
-<body>
-    <!-- Navigation -->
-    <nav class="navbar navbar-expand-lg navbar-dark bg-dark sticky-top">
+{% set section = request.blueprint if request.blueprint in ('workouts', 'exercises', 'templates') else ('home' if request.endpoint == 'main.dashboard' else '') %}
+<body class="{% if current_user.is_authenticated %}has-tabbar{% endif %} {% block body_class %}{% endblock %}">
+    <!-- Top bar: brand + account. Section links show here on wide screens only. -->
+    <nav class="navbar navbar-expand app-topbar sticky-top">
         <div class="container-fluid">
             <a class="navbar-brand" href="{{ url_for('main.index') }}">
-                <img src="{{ url_for('static', filename='svg/ARISE.svg') }}" width="200" alt="Gym Manager Logo"/>
+                <img src="{{ url_for('static', filename='svg/ARISE.svg') }}" height="26" alt="ARISE"/>
             </a>
-            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
-                <span class="navbar-toggler-icon"></span>
-            </button>
-            <div class="collapse navbar-collapse" id="navbarNav">
-                <ul class="navbar-nav ms-auto">
-                    {% if current_user.is_authenticated %}
-                        <li class="nav-item">
-                            <a class="nav-link" href="{{ url_for('main.dashboard') }}">
-                                <i class="fa-solid fa-gauge"></i> Dashboard
-                            </a>
-                        </li>
-                        <li class="nav-item">
-                            <a class="nav-link" href="{{ url_for('workouts.list') }}">
-                                <i class="fa-solid fa-calendar-check"></i> Workouts
-                            </a>
-                        </li>
-                        <li class="nav-item">
-                            <a class="nav-link" href="{{ url_for('exercises.browse') }}">
-                                <i class="fa-solid fa-list-ul"></i> Exercises
-                            </a>
-                        </li>
-                        <li class="nav-item">
-                            <a class="nav-link" href="{{ url_for('templates.list') }}">
-                                <i class="fa-solid fa-bookmark"></i> Templates
-                            </a>
-                        </li>
-                        <li class="nav-item dropdown">
-                            <a class="nav-link dropdown-toggle" href="#" id="navbarDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
-                                <i class="fa-solid fa-circle-user"></i> {{ current_user.username }}
-                            </a>
-                            <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="navbarDropdown">
-                                <li><a class="dropdown-item" href="{{ url_for('auth.settings') }}">
-                                    <i class="fa-solid fa-gear"></i> Settings
-                                </a></li>
-                                <li><hr class="dropdown-divider"></li>
-                                <li><a class="dropdown-item" href="{{ url_for('auth.logout') }}">
-                                    <i class="fa-solid fa-right-from-bracket"></i> Logout
-                                </a></li>
-                            </ul>
-                        </li>
-                    {% else %}
-                        <li class="nav-item">
-                            <a class="nav-link" href="{{ url_for('auth.login') }}">
-                                <i class="fa-solid fa-right-to-bracket"></i> Login
-                            </a>
-                        </li>
-                        <li class="nav-item">
-                            <a class="nav-link" href="{{ url_for('auth.register') }}">
-                                <i class="fa-solid fa-user-plus"></i> Register
-                            </a>
-                        </li>
-                    {% endif %}
-                </ul>
-            </div>
+            <ul class="navbar-nav ms-auto align-items-center">
+                {% if current_user.is_authenticated %}
+                    <li class="nav-item d-none d-lg-block">
+                        <a class="nav-link {{ 'active' if section == 'home' }}" href="{{ url_for('main.dashboard') }}">Home</a>
+                    </li>
+                    <li class="nav-item d-none d-lg-block">
+                        <a class="nav-link {{ 'active' if section == 'workouts' }}" href="{{ url_for('workouts.list') }}">Workouts</a>
+                    </li>
+                    <li class="nav-item d-none d-lg-block">
+                        <a class="nav-link {{ 'active' if section == 'templates' }}" href="{{ url_for('templates.list') }}">Templates</a>
+                    </li>
+                    <li class="nav-item d-none d-lg-block">
+                        <a class="nav-link {{ 'active' if section == 'exercises' }}" href="{{ url_for('exercises.browse') }}">Exercises</a>
+                    </li>
+                    <li class="nav-item dropdown">
+                        <a class="nav-link account-button" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false" aria-label="Account menu">
+                            <i class="fa-solid fa-circle-user"></i>
+                        </a>
+                        <ul class="dropdown-menu dropdown-menu-end">
+                            <li><h6 class="dropdown-header">{{ current_user.username }}</h6></li>
+                            <li><a class="dropdown-item" href="{{ url_for('auth.settings') }}">
+                                <i class="fa-solid fa-gear"></i> Settings
+                            </a></li>
+                            <li><a class="dropdown-item" href="{{ url_for('auth.invitations') }}">
+                                <i class="fa-solid fa-user-plus"></i> Invitations
+                            </a></li>
+                            <li><hr class="dropdown-divider"></li>
+                            <li>
+                                <form method="POST" action="{{ url_for('auth.logout') }}">
+                                    {{ csrf_field() }}
+                                    <button type="submit" class="dropdown-item">
+                                        <i class="fa-solid fa-right-from-bracket"></i> Log out
+                                    </button>
+                                </form>
+                            </li>
+                        </ul>
+                    </li>
+                {% else %}
+                    <li class="nav-item">
+                        <a class="nav-link" href="{{ url_for('auth.login') }}">Log in</a>
+                    </li>
+                {% endif %}
+            </ul>
         </div>
     </nav>
 
     <!-- Flash messages -->
-    <div class="container-fluid mt-3">
-        {% with messages = get_flashed_messages(with_categories=true) %}
-            {% if messages %}
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+            <div class="container mt-3">
                 {% for category, message in messages %}
                     <div class="alert alert-{{ 'danger' if category == 'error' else category }} alert-dismissible fade show" role="alert">
                         {{ message }}
                         <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
                     </div>
                 {% endfor %}
-            {% endif %}
-        {% endwith %}
-    </div>
+            </div>
+        {% endif %}
+    {% endwith %}
 
     <!-- Main content -->
-    <main class="container-fluid py-3">
+    <main class="py-3">
         {% block content %}{% endblock %}
     </main>
 
-    <!-- Footer -->
-    <footer class="footer mt-auto py-3 bg-dark">
-        <div class="container-fluid text-center text-muted">
-            <small>ARISE the Gym Manager &copy; 2026</small>
-        </div>
-    </footer>
+    {% if current_user.is_authenticated %}
+    <!-- Bottom tab bar (phones and tablets) -->
+    <nav class="app-tabbar d-lg-none" aria-label="Main">
+        <a href="{{ url_for('main.dashboard') }}" class="{{ 'active' if section == 'home' }}">
+            <i class="fa-solid fa-house"></i><span>Home</span>
+        </a>
+        <a href="{{ url_for('workouts.list') }}" class="{{ 'active' if section == 'workouts' and request.endpoint != 'workouts.create' }}">
+            <i class="fa-solid fa-calendar-check"></i><span>Workouts</span>
+        </a>
+        <a href="{{ url_for('workouts.create') }}" class="tab-new" aria-label="New workout">
+            <i class="fa-solid fa-plus"></i>
+        </a>
+        <a href="{{ url_for('templates.list') }}" class="{{ 'active' if section == 'templates' }}">
+            <i class="fa-solid fa-bookmark"></i><span>Templates</span>
+        </a>
+        <a href="{{ url_for('exercises.browse') }}" class="{{ 'active' if section == 'exercises' }}">
+            <i class="fa-solid fa-dumbbell"></i><span>Exercises</span>
+        </a>
+    </nav>
+    {% endif %}
 
-    <!-- Bootstrap JS -->
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+    <!-- Shared confirm dialog (window.gm.confirm, forms with data-confirm) -->
+    <div class="modal fade" id="gm-confirm" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered modal-sm">
+            <div class="modal-content">
+                <div class="modal-body pt-4">
+                    <p class="mb-0" id="gm-confirm-message"></p>
+                </div>
+                <div class="modal-footer border-0 pt-0">
+                    <button type="button" class="btn btn-outline-secondary btn-touch flex-fill" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-primary btn-touch flex-fill" id="gm-confirm-ok">OK</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="toast-container position-fixed start-50 translate-middle-x p-3" id="gm-toasts"></div>
+
+    <script src="{{ url_for('static', filename='vendor/bootstrap.bundle.min.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/app.js') }}"></script>
     {% block extra_js %}{% endblock %}
 </body>
 </html>

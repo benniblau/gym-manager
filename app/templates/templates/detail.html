@@ -1,125 +1,66 @@
 {% extends "base.html" %}
+{% from 'includes/exercise_summary.html' import exercise_summary %}
 
 {% block title %}{{ template.name }} - Gym Manager{% endblock %}
 
 {% block content %}
 <div class="container">
-    <div class="d-flex justify-content-between align-items-center mb-4">
-        <h1><i class="fa-solid fa-bookmark"></i> {{ template.name }}</h1>
-        <div>
-            <span class="badge bg-info fs-5">Template</span>
-            {% if template.is_public %}
-                <span class="badge bg-success fs-5"><i class="fa-solid fa-globe"></i> Public</span>
-            {% else %}
-                <span class="badge bg-secondary fs-5"><i class="fa-solid fa-lock"></i> Private</span>
-            {% endif %}
-        </div>
+    <div class="page-header">
+        <h1><i class="fa-solid fa-bookmark text-primary"></i> {{ template.name }}</h1>
+        <span class="badge badge-status status-planned">
+            <i class="fa-solid {{ 'fa-globe' if template.is_public else 'fa-lock' }}"></i> {{ 'Public' if template.is_public else 'Private' }}
+        </span>
     </div>
 
-    <!-- Creator attribution for non-owners viewing public templates -->
-    {% if not is_owner %}
-        <div class="alert alert-info">
-            <i class="fa-solid fa-circle-user"></i> Created by <strong>{{ template_dict.creator_username }}</strong>
-            {% if template.is_public %}
-                · <i class="fa-solid fa-users"></i> Used {{ template.usage_count }} times
-            {% endif %}
-        </div>
+    <p class="text-muted mb-1">
+        Template{% if not is_owner %} by {{ template_dict.creator_username }}{% endif %}{% if template.usage_count %} · used {{ template.usage_count }} times{% endif %}
+    </p>
+    {% if template.notes %}
+        <p class="mb-1"><i class="fa-solid fa-note-sticky text-muted"></i> {{ template.notes }}</p>
     {% endif %}
 
-    <!-- Template info -->
-    <div class="card mb-4">
-        <div class="card-body">
-            <h5 class="card-title">Template Details</h5>
-            {% if template_dict.creator_username and is_owner and template.is_public %}
-                <p class="mb-2">
-                    <strong><i class="fa-solid fa-users"></i> Usage:</strong> Used {{ template.usage_count }} times by other users
-                </p>
-            {% endif %}
-            {% if template.notes %}
-                <p class="mb-0">
-                    <strong><i class="fa-solid fa-note-sticky"></i> Notes:</strong> {{ template.notes }}
-                </p>
-            {% else %}
-                <p class="mb-0 text-muted">No notes</p>
-            {% endif %}
-        </div>
-    </div>
-
-    <!-- Action buttons -->
-    <div class="d-grid gap-2 mb-4">
-        <a href="{{ url_for('templates.use_template', template_id=template.id) }}" class="btn btn-success btn-lg btn-touch">
-            <i class="fa-solid fa-play"></i> Use Template (Create Workout)
+    <div class="d-flex gap-2 my-3">
+        <a href="{{ url_for('templates.use_template', template_id=template.id) }}" class="btn btn-success btn-lg btn-touch flex-fill">
+            <i class="fa-solid fa-play"></i> Use for a workout
         </a>
         {% if is_owner %}
-            <a href="{{ url_for('templates.edit', template_id=template.id) }}" class="btn btn-info btn-lg btn-touch">
-                <i class="fa-solid fa-pencil"></i> Edit Exercises
+            <a href="{{ url_for('templates.edit', template_id=template.id) }}" class="btn btn-outline-secondary btn-lg btn-touch" aria-label="Edit template">
+                <i class="fa-solid fa-pencil"></i>
             </a>
-            <form method="POST" action="{{ url_for('templates.delete', template_id=template.id) }}">
-                <button type="submit" class="btn btn-danger btn-lg btn-touch w-100" onclick="return confirm('Are you sure you want to delete this template?')">
-                    <i class="fa-solid fa-trash"></i> Delete Template
+            <div class="dropdown">
+                <button type="button" class="btn btn-outline-secondary btn-lg btn-touch h-100" data-bs-toggle="dropdown" aria-expanded="false" aria-label="More actions">
+                    <i class="fa-solid fa-ellipsis-vertical"></i>
                 </button>
-            </form>
+                <ul class="dropdown-menu dropdown-menu-end action-menu">
+                    <li>
+                        <form method="POST" action="{{ url_for('templates.toggle_privacy', template_id=template.id) }}">
+                            {{ csrf_field() }}
+                            <button type="submit" class="dropdown-item">
+                                {% if template.is_public %}<i class="fa-solid fa-lock"></i> Make private{% else %}<i class="fa-solid fa-globe"></i> Make public{% endif %}
+                            </button>
+                        </form>
+                    </li>
+                    <li><hr class="dropdown-divider"></li>
+                    <li>
+                        <form method="POST" action="{{ url_for('templates.delete', template_id=template.id) }}"
+                              data-confirm="Delete this template? Workouts already created from it are kept." data-confirm-ok="Delete" data-confirm-danger>
+                            {{ csrf_field() }}
+                            <button type="submit" class="dropdown-item text-danger"><i class="fa-solid fa-trash"></i> Delete template</button>
+                        </form>
+                    </li>
+                </ul>
+            </div>
         {% endif %}
     </div>
 
-    <!-- Exercises list -->
-    <h3><i class="fa-solid fa-list-check"></i> Exercises ({{ exercises|length }})</h3>
+    <h2 class="section-title">Exercises{% if exercises %} · {{ exercises|length }}{% endif %}</h2>
     {% if exercises %}
-        <div class="list-group mb-4">
-            {% for exercise in exercises %}
-                <div class="list-group-item">
-                    <div class="d-flex justify-content-between align-items-start">
-                        <div>
-                            <h5 class="mb-1">{{ loop.index }}. {{ exercise.exercise_name }}</h5>
-                            <p class="mb-1 text-muted small">{{ exercise.exercise_description[:100] if exercise.exercise_description else '' }}</p>
-
-                            <!-- Target values -->
-                            <div class="mt-2">
-                                {% if exercise.target_sets or exercise.target_reps or exercise.target_weight %}
-                                    <span class="badge badge-target me-2">
-                                        Target:
-                                        {% if exercise.target_sets %}{{ exercise.target_sets }} sets{% endif %}
-                                        {% if exercise.target_reps %} × {{ exercise.target_reps }} reps{% endif %}
-                                        {% if exercise.target_weight %} @ {{ exercise.target_weight }} kg{% endif %}
-                                    </span>
-                                {% endif %}
-                            </div>
-
-                            {% if exercise.notes %}
-                                <p class="mb-0 mt-2 small">
-                                    <i class="fa-solid fa-note-sticky"></i> {{ exercise.notes }}
-                                </p>
-                            {% endif %}
-                        </div>
-                        <div class="btn-group" role="group">
-                            <button type="button"
-                                    class="btn btn-sm btn-outline-info btn-touch view-exercise-details"
-                                    data-exercise-id="{{ exercise.exercise_id }}"
-                                    data-exercise-name="{{ exercise.exercise_name }}"
-                                    title="View details">
-                                <i class="fa-solid fa-circle-info"></i>
-                            </button>
-                            <a href="{{ exercise.exercise_name | exercem_url }}"
-                               class="btn btn-sm btn-outline-success btn-touch"
-                               target="_blank"
-                               title="View on exercem.us">
-                                <i class="fa-solid fa-link"></i>
-                            </a>
-                        </div>
-                    </div>
-                </div>
-            {% endfor %}
-        </div>
+        {{ exercise_summary(exercises) }}
     {% else %}
-        <div class="alert alert-warning">
-            <i class="fa-solid fa-triangle-exclamation"></i> No exercises added yet.
-            <a href="{{ url_for('templates.edit', template_id=template.id) }}" class="alert-link">Add some exercises</a>
-        </div>
+        <p class="text-muted">
+            No exercises yet.{% if is_owner %} <a href="{{ url_for('templates.edit', template_id=template.id) }}">Add some</a>.{% endif %}
+        </p>
     {% endif %}
-
-    <a href="{{ url_for('templates.list') }}" class="btn btn-outline-secondary btn-lg btn-touch">
-        <i class="fa-solid fa-arrow-left"></i> Back to Templates
-    </a>
 </div>
 
 {% include 'includes/exercise_details_modal.html' %}

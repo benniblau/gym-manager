@@ -1,22 +1,86 @@
 from flask import Blueprint, render_template, redirect, url_for, flash, request, jsonify, abort, make_response
 from flask_login import login_required, current_user
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, date
 
-from app.models import Workout, WorkoutExercise, Exercise, StravaConnection, StravaUpload, get_db
+from gymcore import sets as core_sets
+from gymcore import workouts as core
+from gymcore.db import parse_dt
+from app.models import Workout, Exercise, StravaConnection, StravaUpload, get_db
+from wtforms.validators import Optional
+
 from app.blueprints.workouts.forms import WorkoutForm
+from app.utils import nice_date, duration_text
 from app.utils.tcx_export import generate_tcx_xml
 
 workouts_bp = Blueprint('workouts', __name__)
 
+PER_PAGE = 30
+
+
+# ===== OWNERSHIP HELPERS =====
+# Exercise routes are shared by workouts and templates (a template is a workout
+# row), so they only require that the current user owns the parent.
+
+def _owned(workout_id, is_template=None):
+    """The current user's workout as a model object, or 404."""
+    try:
+        row = core.owned_workout(get_db(), current_user.id, workout_id, is_template)
+    except core.NotFound:
+        abort(404)
+    return Workout(**dict(row))
+
+
+def _owned_entry(workout_id, workout_exercise_id):
+    """An exercise entry that belongs to this workout of the current user, or 404."""
+    try:
+        return core.owned_entry(get_db(), current_user.id, workout_exercise_id, workout_id=workout_id)
+    except core.NotFound:
+        abort(404)
+
+
+def _edit_url(workout):
+    endpoint = 'templates.edit' if workout.is_template else 'workouts.edit'
+    key = 'template_id' if workout.is_template else 'workout_id'
+    return url_for(endpoint, **{key: workout.id})
+
+
+def _exercise_list(workout):
+    """JSON for the edit page: the re-rendered exercise list after a change."""
+    exercises = workout.get_exercises()
+    return jsonify({
+        'success': True,
+        'count': len(exercises),
+        'html': render_template('workouts/_exercise_list.html', exercises=exercises),
+    })
+
+
+def _share_text(workout, exercises):
+    """Plain-text summary for the share sheet / clipboard."""
+    lines = [nice_date(workout.scheduled_date)] if workout.scheduled_date else []
+    if workout.duration_minutes:
+        lines.append(f'Duration: {duration_text(workout.duration_minutes)}')
+    lines.append('')
+    for number, exercise in enumerate(exercises, start=1):
+        details = exercise['sets_text'] or core_sets.describe_plan(exercise)
+        lines.append(f"{number}. {exercise['exercise_name']}" + (f' - {details}' if details else ''))
+    if workout.notes:
+        lines += ['', workout.notes]
+    return '\n'.join(lines)
+
+
+# ===== WORKOUT PAGES =====
 
 @workouts_bp.route('/')
 @login_required
 def list():
-    """List all workouts for the current user"""
-    all_workouts = Workout.get_by_user(current_user.id)
-    # Exclude templates from workout list
-    workouts = [w for w in all_workouts if not w.is_template]
-    return render_template('workouts/list.html', workouts=workouts)
+    """List the current user's workouts, newest first"""
+    page = max(request.args.get('page', 1, type=int), 1)
+    workouts = Workout.get_by_user(current_user.id, limit=PER_PAGE + 1, offset=(page - 1) * PER_PAGE)
+    return render_template('workouts/list.html',
+                           workouts=workouts[:PER_PAGE],
+                           page=page,
+                           has_next=len(workouts) > PER_PAGE,
+                           today=date.today().isoformat())
 
 
 @workouts_bp.route('/create', methods=['GET', 'POST'])
@@ -24,50 +88,45 @@ def list():
 def create():
     """Create a new workout"""
     form = WorkoutForm()
+    is_template = request.form.get('is_template') == 'on'
+    if is_template:
+        # Templates have no schedule; the date inputs are disabled in the form
+        form.scheduled_date.validators = [Optional()]
 
     if form.validate_on_submit():
-        is_template = request.form.get('is_template') == 'on'
 
         if is_template:
-            # Create as template
             template = Workout.create_template(
                 user_id=current_user.id,
                 name=form.name.data,
                 notes=form.notes.data
             )
-            flash(f'Template "{template.name}" created successfully!', 'success')
+            flash(f'Template "{template.name}" created.', 'success')
             return redirect(url_for('templates.edit', template_id=template.id))
-        else:
-            # Create regular workout
-            duration_minutes = form.duration_minutes.data
-            scheduled_time = form.scheduled_time.data
-            scheduled_date = form.scheduled_date.data
 
-            # Calculate started_at and completed_at if both time and duration provided
-            started_at = None
-            completed_at = None
-            if scheduled_time and duration_minutes:
-                try:
-                    started_at = datetime.combine(scheduled_date, datetime.strptime(scheduled_time, '%H:%M').time())
-                    completed_at = started_at + timedelta(minutes=duration_minutes)
-                except (ValueError, TypeError):
-                    pass
+        duration_minutes = form.duration_minutes.data
+        scheduled_time = form.scheduled_time.data
+        scheduled_date = form.scheduled_date.data
 
-            workout = Workout.create(
-                user_id=current_user.id,
-                name=form.name.data,
-                scheduled_date=scheduled_date,
-                scheduled_time=scheduled_time,
-                duration_minutes=duration_minutes,
-                started_at=started_at,
-                completed_at=completed_at,
-                notes=form.notes.data
-            )
-            flash(f'Workout "{workout.name}" created successfully!', 'success')
-            return redirect(url_for('workouts.edit', workout_id=workout.id))
+        # Calculate started_at and completed_at if both time and duration provided
+        started_at = None
+        completed_at = None
+        if scheduled_time and duration_minutes:
+            started_at = datetime.combine(scheduled_date, scheduled_time)
+            completed_at = started_at + timedelta(minutes=duration_minutes)
 
-    from datetime import date
-    # Get user's templates for quick selection
+        workout = Workout.create(
+            user_id=current_user.id,
+            name=form.name.data,
+            scheduled_date=scheduled_date,
+            scheduled_time=scheduled_time.strftime('%H:%M') if scheduled_time else None,
+            duration_minutes=duration_minutes,
+            started_at=started_at,
+            completed_at=completed_at,
+            notes=form.notes.data
+        )
+        return redirect(url_for('workouts.edit', workout_id=workout.id))
+
     templates = Workout.get_templates_by_user(current_user.id, limit=10)
     return render_template('workouts/create.html', form=form, today=date.today(), templates=templates)
 
@@ -76,414 +135,385 @@ def create():
 @login_required
 def detail(workout_id):
     """View workout details"""
-    workout = Workout.get_by_id(workout_id)
-
-    if not workout or workout.user_id != current_user.id:
-        abort(404)
-
+    workout = _owned(workout_id, is_template=False)
     exercises = workout.get_exercises()
 
-    # Check Strava connection and upload status
     strava_connected = StravaConnection.is_connected(current_user.id)
     strava_upload = StravaUpload.get_by_workout_id(workout_id)
-    # Allow multiple uploads - don't mark as uploaded, just show last upload info
     last_upload_success = strava_upload is not None and strava_upload['upload_status'] == 'success'
     upload_failed = strava_upload is not None and strava_upload['upload_status'] == 'failed'
-    last_strava_activity_id = strava_upload['strava_activity_id'] if strava_upload and last_upload_success else None
+    last_strava_activity_id = strava_upload['strava_activity_id'] if last_upload_success else None
 
     return render_template('workouts/detail.html',
-                         workout=workout,
-                         exercises=exercises,
-                         strava_connected=strava_connected,
-                         strava_uploaded=False,  # Always allow re-uploading
-                         upload_failed=upload_failed,
-                         strava_activity_id=last_strava_activity_id,
-                         last_upload_success=last_upload_success)
+                           workout=workout,
+                           exercises=exercises,
+                           share_text=_share_text(workout, exercises),
+                           logged_count=sum(1 for e in exercises if e['sets']),
+                           strava_connected=strava_connected,
+                           upload_failed=upload_failed,
+                           strava_activity_id=last_strava_activity_id,
+                           last_upload_success=last_upload_success)
 
 
-@workouts_bp.route('/<int:workout_id>/edit', methods=['GET', 'POST'])
+@workouts_bp.route('/<int:workout_id>/edit')
 @login_required
 def edit(workout_id):
-    """Edit workout (add/remove exercises)"""
-    workout = Workout.get_by_id(workout_id)
-
-    if not workout or workout.user_id != current_user.id:
-        abort(404)
-
-    exercises = workout.get_exercises()
-
-    # Get all available exercises for the dropdown
-    all_exercises = Exercise.get_all(limit=872)  # Get all exercises
-
-    # Get filter options
-    categories = Exercise.get_all_categories()
-    muscles = Exercise.get_all_muscles()
-    equipment_list = Exercise.get_all_equipment()
+    """Edit workout (details, add/remove/reorder exercises)"""
+    workout = _owned(workout_id, is_template=False)
 
     return render_template('workouts/edit.html',
-                         workout=workout,
-                         exercises=exercises,
-                         all_exercises=all_exercises,
-                         categories=categories,
-                         muscles=muscles,
-                         equipment_list=equipment_list)
+                           workout=workout,
+                           exercises=workout.get_exercises(),
+                           categories=Exercise.get_all_categories(),
+                           muscles=Exercise.get_all_muscles())
 
 
-@workouts_bp.route('/<int:workout_id>/update-name', methods=['POST'])
+@workouts_bp.route('/<int:workout_id>/update-details', methods=['POST'])
 @login_required
-def update_name(workout_id):
-    """Update workout name"""
-    workout = Workout.get_by_id(workout_id)
+def update_details(workout_id):
+    """Update name, notes and (for workouts) date and times in one go"""
+    workout = _owned(workout_id)
+    back = redirect(_edit_url(workout))
 
-    if not workout or workout.user_id != current_user.id:
-        abort(404)
+    name = request.form.get('name', '').strip()
+    if not name:
+        flash('The name cannot be empty.', 'danger')
+        return back
 
-    new_name = request.form.get('name', '').strip()
+    fields = {'name': name[:100], 'notes': request.form.get('notes', '').strip() or None}
 
-    if not new_name:
-        flash('Workout name cannot be empty', 'danger')
-        return redirect(url_for('workouts.edit', workout_id=workout_id))
+    if not workout.is_template:
+        started_raw = request.form.get('started_at', '').strip()
+        completed_raw = request.form.get('completed_at', '').strip()
+        duration_raw = request.form.get('duration_minutes', '').strip()
 
-    # Update workout name
-    workout.update(name=new_name)
+        start_dt = parse_dt(started_raw)
+        end_dt = parse_dt(completed_raw)
+        if (started_raw and not start_dt) or (completed_raw and not end_dt):
+            flash('Invalid date/time format.', 'danger')
+            return back
 
-    flash('Workout name updated successfully', 'success')
-    return redirect(url_for('workouts.edit', workout_id=workout_id))
+        duration_minutes = None
+        if duration_raw:
+            try:
+                duration_minutes = int(duration_raw)
+            except ValueError:
+                flash('Invalid duration.', 'danger')
+                return back
+
+        # End time wins when all three are given; otherwise fill in the missing one
+        if start_dt and end_dt:
+            if start_dt >= end_dt:
+                flash('Start time must be before end time.', 'danger')
+                return back
+            duration_minutes = int((end_dt - start_dt).total_seconds() / 60)
+        elif start_dt and duration_minutes:
+            end_dt = start_dt + timedelta(minutes=duration_minutes)
+
+        fields.update(started_at=start_dt, completed_at=end_dt, duration_minutes=duration_minutes)
+
+        scheduled_date = request.form.get('scheduled_date', '').strip()
+        if scheduled_date:
+            try:
+                fields['scheduled_date'] = datetime.strptime(scheduled_date, '%Y-%m-%d').date()
+            except ValueError:
+                flash('Invalid date.', 'danger')
+                return back
+        scheduled_time = request.form.get('scheduled_time', '').strip()
+        fields['scheduled_time'] = scheduled_time[:5] or None
+
+    workout.update(**fields)
+    flash('Saved.', 'success')
+    return back
 
 
-@workouts_bp.route('/<int:workout_id>/update-times', methods=['POST'])
+# ===== EXERCISE ENTRIES (AJAX, shared by workout and template edit pages) =====
+
+@workouts_bp.route('/<int:workout_id>/exercises/list')
 @login_required
-def update_times(workout_id):
-    """Update workout start/end times and duration"""
-    workout = Workout.get_by_id(workout_id)
-
-    if not workout or workout.user_id != current_user.id:
-        abort(404)
-
-    started_at = request.form.get('started_at', '').strip()
-    completed_at = request.form.get('completed_at', '').strip()
-    duration_str = request.form.get('duration_minutes', '').strip()
-
-    update_params = {}
-    start_dt = None
-    end_dt = None
-    duration_minutes = None
-
-    # Parse started_at
-    if started_at:
-        try:
-            start_dt = datetime.fromisoformat(started_at)
-            update_params['started_at'] = start_dt
-        except ValueError:
-            flash('Invalid start date/time format', 'danger')
-            return redirect(url_for('workouts.edit', workout_id=workout_id))
-    else:
-        update_params['started_at'] = None
-
-    # Parse completed_at
-    if completed_at:
-        try:
-            end_dt = datetime.fromisoformat(completed_at)
-            update_params['completed_at'] = end_dt
-        except ValueError:
-            flash('Invalid end date/time format', 'danger')
-            return redirect(url_for('workouts.edit', workout_id=workout_id))
-    else:
-        update_params['completed_at'] = None
-
-    # Parse duration
-    if duration_str:
-        try:
-            duration_minutes = int(duration_str)
-        except ValueError:
-            flash('Invalid duration', 'danger')
-            return redirect(url_for('workouts.edit', workout_id=workout_id))
-
-    # Auto-calculate missing fields
-    if start_dt and duration_minutes and not end_dt:
-        # Calculate end time from start + duration
-        end_dt = start_dt + timedelta(minutes=duration_minutes)
-        update_params['completed_at'] = end_dt
-    elif start_dt and end_dt and not duration_minutes:
-        # Calculate duration from start and end times
-        duration_minutes = int((end_dt - start_dt).total_seconds() / 60)
-    elif start_dt and end_dt and duration_minutes:
-        # All three provided - end time takes precedence, recalculate duration
-        duration_minutes = int((end_dt - start_dt).total_seconds() / 60)
-
-    update_params['duration_minutes'] = duration_minutes
-
-    # Validate that start is before end
-    if update_params.get('started_at') and update_params.get('completed_at'):
-        if update_params['started_at'] >= update_params['completed_at']:
-            flash('Start time must be before end time', 'danger')
-            return redirect(url_for('workouts.edit', workout_id=workout_id))
-
-    workout.update(**update_params)
-
-    flash('Workout times updated successfully', 'success')
-    return redirect(url_for('workouts.edit', workout_id=workout_id))
-
-
-@workouts_bp.route('/<int:workout_id>/update-notes', methods=['POST'])
-@login_required
-def update_notes(workout_id):
-    """Update workout notes"""
-    workout = Workout.get_by_id(workout_id)
-
-    if not workout or workout.user_id != current_user.id:
-        abort(404)
-
-    notes = request.form.get('notes', '').strip()
-
-    # Update workout notes (can be empty)
-    workout.update(notes=notes if notes else None)
-
-    flash('Workout notes updated successfully', 'success')
-    return redirect(url_for('workouts.edit', workout_id=workout_id))
+def exercise_list(workout_id):
+    """Current exercise list as an HTML fragment"""
+    return _exercise_list(_owned(workout_id))
 
 
 @workouts_bp.route('/<int:workout_id>/exercises/add', methods=['POST'])
 @login_required
 def add_exercise(workout_id):
-    """Add exercise to workout (AJAX endpoint)"""
-    workout = Workout.get_by_id(workout_id)
-
-    if not workout or workout.user_id != current_user.id:
-        return jsonify({'error': 'Unauthorized'}), 403
+    """Add exercise to workout"""
+    workout = _owned(workout_id)
 
     exercise_id = request.form.get('exercise_id', type=int)
-    target_sets = request.form.get('target_sets', type=int)
-    target_reps = request.form.get('target_reps', type=int)
-    target_weight = request.form.get('target_weight', type=float)
-    target_duration = request.form.get('target_duration', type=int)
-    notes = request.form.get('notes')
-
     if not exercise_id:
         return jsonify({'error': 'Exercise ID required'}), 400
 
-    # Get the next order position
-    order_position = WorkoutExercise.get_next_order_position(workout_id)
+    db = get_db()
+    try:
+        with db:
+            core.add_entry(
+                db, workout_id, exercise_id,
+                target_sets=request.form.get('target_sets', type=int),
+                target_reps=request.form.get('target_reps', type=int),
+                target_weight=request.form.get('target_weight', type=float),
+                target_duration=request.form.get('target_duration', type=int),
+                notes=request.form.get('notes') or None,
+            )
+    except core.NotFound as e:
+        return jsonify({'error': str(e)}), 404
 
-    # Add exercise to workout
-    workout_exercise_id = WorkoutExercise.add_to_workout(
-        workout_id=workout_id,
-        exercise_id=exercise_id,
-        order_position=order_position,
-        target_sets=target_sets,
-        target_reps=target_reps,
-        target_weight=target_weight,
-        target_duration=target_duration,
-        notes=notes
-    )
-
-    # Get the exercise details
-    exercise = WorkoutExercise.get_by_id(workout_exercise_id)
-
-    return jsonify({
-        'success': True,
-        'exercise': exercise
-    })
+    return _exercise_list(workout)
 
 
 @workouts_bp.route('/<int:workout_id>/exercises/<int:workout_exercise_id>/update-targets', methods=['POST'])
 @login_required
 def update_exercise_targets(workout_id, workout_exercise_id):
-    """Update exercise target values (AJAX endpoint)"""
-    workout = Workout.get_by_id(workout_id)
+    """Update exercise target values"""
+    workout = _owned(workout_id)
+    _owned_entry(workout_id, workout_exercise_id)
 
-    if not workout or workout.user_id != current_user.id:
-        return jsonify({'error': 'Unauthorized'}), 403
+    db = get_db()
+    with db:
+        core.update_entry(
+            db, workout_exercise_id,
+            target_sets=request.form.get('target_sets', type=int),
+            target_reps=request.form.get('target_reps', type=int),
+            target_weight=request.form.get('target_weight', type=float),
+            target_duration=request.form.get('target_duration', type=int),
+            notes=request.form.get('notes') or None,
+        )
 
-    # Get form data
-    target_sets = request.form.get('target_sets', type=int)
-    target_reps = request.form.get('target_reps', type=int)
-    target_weight = request.form.get('target_weight', type=float)
-    target_duration = request.form.get('target_duration', type=int)
-    notes = request.form.get('notes')
-
-    # Update the exercise
-    WorkoutExercise.update(
-        workout_exercise_id,
-        target_sets=target_sets,
-        target_reps=target_reps,
-        target_weight=target_weight,
-        target_duration=target_duration,
-        notes=notes
-    )
-
-    return jsonify({'success': True})
+    return _exercise_list(workout)
 
 
 @workouts_bp.route('/<int:workout_id>/exercises/<int:workout_exercise_id>/duplicate', methods=['POST'])
 @login_required
 def duplicate_exercise(workout_id, workout_exercise_id):
-    """Duplicate an exercise in the workout (AJAX endpoint)"""
-    workout = Workout.get_by_id(workout_id)
+    """Duplicate an exercise in the workout"""
+    workout = _owned(workout_id)
+    _owned_entry(workout_id, workout_exercise_id)
 
-    if not workout or workout.user_id != current_user.id:
-        return jsonify({'error': 'Unauthorized'}), 403
-
-    # Get the original exercise
-    original = WorkoutExercise.get_by_id(workout_exercise_id)
-    if not original:
-        return jsonify({'error': 'Exercise not found'}), 404
-
-    # Get the order position right after the original
-    new_order = original['order_position'] + 1
-
-    # Shift all exercises after this position
     db = get_db()
-    db.execute('''
-        UPDATE workout_exercises
-        SET order_position = order_position + 1
-        WHERE workout_id = ? AND order_position >= ?
-    ''', (workout_id, new_order))
-    db.commit()
+    with db:
+        core.duplicate_entry(db, workout_exercise_id)
 
-    # Create the duplicate
-    new_exercise_id = WorkoutExercise.add_to_workout(
-        workout_id=workout_id,
-        exercise_id=original['exercise_id'],
-        order_position=new_order,
-        target_sets=original.get('target_sets'),
-        target_reps=original.get('target_reps'),
-        target_weight=original.get('target_weight'),
-        target_duration=original.get('target_duration'),
-        notes=original.get('notes')
-    )
-
-    # Get the new exercise details
-    new_exercise = WorkoutExercise.get_by_id(new_exercise_id)
-
-    return jsonify({
-        'success': True,
-        'exercise': new_exercise
-    })
+    return _exercise_list(workout)
 
 
 @workouts_bp.route('/<int:workout_id>/exercises/<int:workout_exercise_id>/remove', methods=['POST'])
 @login_required
 def remove_exercise(workout_id, workout_exercise_id):
-    """Remove exercise from workout (AJAX endpoint)"""
-    workout = Workout.get_by_id(workout_id)
+    """Remove exercise from workout"""
+    workout = _owned(workout_id)
+    _owned_entry(workout_id, workout_exercise_id)
 
-    if not workout or workout.user_id != current_user.id:
-        return jsonify({'error': 'Unauthorized'}), 403
+    db = get_db()
+    with db:
+        core.remove_entry(db, workout_exercise_id)
 
-    WorkoutExercise.delete(workout_exercise_id)
-
-    return jsonify({'success': True})
+    return _exercise_list(workout)
 
 
 @workouts_bp.route('/<int:workout_id>/exercises/<int:workout_exercise_id>/reorder', methods=['POST'])
 @login_required
 def reorder_exercise(workout_id, workout_exercise_id):
-    """Reorder exercise in workout (AJAX endpoint)"""
-    workout = Workout.get_by_id(workout_id)
+    """Move an exercise (or its whole superset) up or down"""
+    workout = _owned(workout_id)
+    _owned_entry(workout_id, workout_exercise_id)
 
-    if not workout or workout.user_id != current_user.id:
-        return jsonify({'error': 'Unauthorized'}), 403
-
-    direction = request.form.get('direction')  # 'up' or 'down'
-
+    direction = request.form.get('direction')
     if direction not in ['up', 'down']:
         return jsonify({'error': 'Invalid direction'}), 400
 
-    WorkoutExercise.reorder(workout_exercise_id, direction)
+    db = get_db()
+    with db:
+        core.move_entry(db, workout_exercise_id, direction)
 
-    return jsonify({'success': True})
+    return _exercise_list(workout)
 
 
 @workouts_bp.route('/<int:workout_id>/exercises/set-order', methods=['POST'])
 @login_required
 def set_exercise_order(workout_id):
-    """Bulk reorder all exercises via drag-and-drop (AJAX endpoint)"""
-    workout = Workout.get_by_id(workout_id)
+    """Bulk reorder all exercises via drag-and-drop"""
+    workout = _owned(workout_id)
 
-    if not workout or workout.user_id != current_user.id:
-        return jsonify({'error': 'Unauthorized'}), 403
-
-    data = request.get_json()
-    if not data or 'order' not in data:
-        return jsonify({'error': 'Invalid data'}), 400
-
-    exercise_ids = data['order']
-    if not exercise_ids:
+    data = request.get_json(silent=True)
+    if not data or not data.get('order'):
         return jsonify({'error': 'No exercises provided'}), 400
 
-    WorkoutExercise.set_order(workout_id, exercise_ids)
+    db = get_db()
+    try:
+        with db:
+            core.set_order(db, workout_id, data['order'])
+    except ValueError as e:
+        return jsonify({'error': str(e)}), 400
+
+    return _exercise_list(workout)
+
+
+# ===== SUPERSETS =====
+
+@workouts_bp.route('/<int:workout_id>/superset/create', methods=['POST'])
+@login_required
+def create_superset(workout_id):
+    """Create a superset from selected exercises"""
+    workout = _owned(workout_id)
+
+    exercise_ids = request.form.getlist('exercise_ids[]', type=int)
+    if len(exercise_ids) < 2:
+        return jsonify({'error': 'Select at least 2 exercises'}), 400
+
+    db = get_db()
+    try:
+        with db:
+            core.create_superset(db, workout_id, exercise_ids)
+    except ValueError as e:
+        return jsonify({'error': str(e)}), 400
+
+    return _exercise_list(workout)
+
+
+@workouts_bp.route('/<int:workout_id>/superset/<int:group_id>/dissolve', methods=['POST'])
+@login_required
+def dissolve_superset(workout_id, group_id):
+    """Dissolve a superset entirely"""
+    workout = _owned(workout_id)
+
+    db = get_db()
+    with db:
+        core.dissolve_superset(db, workout_id, group_id)
+
+    return _exercise_list(workout)
+
+
+@workouts_bp.route('/<int:workout_id>/superset/<int:group_id>/update-reps', methods=['POST'])
+@login_required
+def update_superset_reps(workout_id, group_id):
+    """Update superset planned or performed rounds"""
+    workout = _owned(workout_id)
+
+    data = request.get_json(silent=True) or request.form
+
+    def rounds(name):
+        try:
+            return max(int(data[name]), 0)
+        except (KeyError, TypeError, ValueError):
+            return None
+
+    db = get_db()
+    with db:
+        core.set_superset_reps(
+            db, workout_id, group_id,
+            target_reps=rounds('target_reps'),
+            actual_reps=rounds('actual_reps'),
+        )
+        if not workout.is_template and rounds('actual_reps'):
+            core.start_workout(db, workout_id)
 
     return jsonify({'success': True})
 
 
-@workouts_bp.route('/<int:workout_id>/log', methods=['GET', 'POST'])
+@workouts_bp.route('/<int:workout_id>/exercises/<int:workout_exercise_id>/remove-from-superset', methods=['POST'])
+@login_required
+def remove_from_superset(workout_id, workout_exercise_id):
+    """Remove exercise from its superset"""
+    workout = _owned(workout_id)
+    _owned_entry(workout_id, workout_exercise_id)
+
+    db = get_db()
+    with db:
+        core.remove_from_superset(db, workout_exercise_id)
+
+    return _exercise_list(workout)
+
+
+# ===== LOGGING =====
+
+def _prepare_log_rows(exercise, last):
+    """Add what the logging page needs to an exercise dict.
+
+    'rows' has one entry per set to show: logged sets as they were recorded,
+    the rest pre-filled from the plan or, failing that, from last time.
+    Nothing is saved until the user ticks a set.
+    """
+    logged = {s['set_number']: s for s in exercise['sets']}
+    last_sets = last['sets'] if last else []
+
+    def default(field, target, index):
+        if exercise[target]:
+            return exercise[target]
+        if last_sets:
+            return last_sets[min(index, len(last_sets) - 1)][field]
+        return None
+
+    count = max([exercise['target_sets'] or len(last_sets) or 1] + [n for n in logged])
+    rows = []
+    for number in range(1, count + 1):
+        done = logged.get(number)
+        rows.append({
+            'number': number,
+            'done': done is not None,
+            'reps': done['reps'] if done else default('reps', 'target_reps', number - 1),
+            'weight': done['weight'] if done else default('weight', 'target_weight', number - 1),
+            'duration': done['duration'] if done else default('duration', 'target_duration', number - 1),
+        })
+
+    has = lambda field: any(row[field] for row in rows)
+    exercise['rows'] = rows
+    exercise['last'] = last
+    # Timed exercises show only a time field; everything else shows reps and weight
+    exercise['show_duration'] = has('duration')
+    exercise['show_reps'] = has('reps') or not exercise['show_duration']
+    exercise['show_weight'] = has('weight') or exercise['show_reps']
+
+
+@workouts_bp.route('/<int:workout_id>/log')
 @login_required
 def log(workout_id):
-    """Mobile-optimized logging interface"""
-    workout = Workout.get_by_id(workout_id)
-
-    if not workout or workout.user_id != current_user.id:
-        abort(404)
-
-    if request.method == 'POST':
-        # Handle bulk update from form submission
-        for exercise in workout.get_exercises():
-            actual_sets = request.form.get(f'sets_{exercise["id"]}', type=int)
-            actual_reps = request.form.get(f'reps_{exercise["id"]}', type=int)
-            actual_weight = request.form.get(f'weight_{exercise["id"]}', type=float)
-
-            if actual_sets or actual_reps or actual_weight:
-                WorkoutExercise.update(
-                    exercise['id'],
-                    actual_sets=actual_sets,
-                    actual_reps=actual_reps,
-                    actual_weight=actual_weight
-                )
-
-        # Mark workout as in_progress if not already
-        if workout.status == 'planned':
-            update_params = {'status': 'in_progress'}
-            if not workout.started_at:
-                update_params['started_at'] = datetime.now()
-            workout.update(**update_params)
-
-        flash('Workout logged successfully!', 'success')
-        return redirect(url_for('workouts.log', workout_id=workout_id))
-
+    """Mobile logging interface: one set at a time"""
+    workout = _owned(workout_id, is_template=False)
     exercises = workout.get_exercises()
-
-    return render_template('workouts/log.html', workout=workout, exercises=exercises)
-
-
-@workouts_bp.route('/<int:workout_id>/exercises/<int:workout_exercise_id>/update', methods=['POST'])
-@login_required
-def update_exercise(workout_id, workout_exercise_id):
-    """Update exercise actual values (AJAX endpoint for auto-save)"""
-    workout = Workout.get_by_id(workout_id)
-
-    if not workout or workout.user_id != current_user.id:
-        return jsonify({'error': 'Unauthorized'}), 403
-
-    actual_sets = request.form.get('actual_sets', type=int)
-    actual_reps = request.form.get('actual_reps', type=int)
-    actual_weight = request.form.get('actual_weight', type=float)
-    actual_duration = request.form.get('actual_duration', type=int)
-
-    WorkoutExercise.update(
-        workout_exercise_id,
-        actual_sets=actual_sets,
-        actual_reps=actual_reps,
-        actual_weight=actual_weight,
-        actual_duration=actual_duration
+    previous = core_sets.last_performance(
+        get_db(), current_user.id, [e['exercise_id'] for e in exercises], exclude_workout_id=workout_id
     )
+    for exercise in exercises:
+        _prepare_log_rows(exercise, previous.get(exercise['exercise_id']))
 
-    # Mark workout as in_progress if not already
-    if workout.status == 'planned':
-        update_params = {'status': 'in_progress'}
-        if not workout.started_at:
-            update_params['started_at'] = datetime.now()
-        workout.update(**update_params)
+    # Display blocks: a superset is one block of several exercises
+    blocks, by_group = [], {}
+    for exercise in exercises:
+        group = exercise['superset_group_id']
+        if group and group in by_group:
+            by_group[group]['exercises'].append(exercise)
+            continue
+        block = {'superset_id': group, 'exercises': [exercise]}
+        blocks.append(block)
+        if group:
+            by_group[group] = block
+
+    return render_template('workouts/log.html', workout=workout, exercises=exercises, blocks=blocks)
+
+
+@workouts_bp.route('/<int:workout_id>/exercises/<int:workout_exercise_id>/sets/<int:set_number>', methods=['POST'])
+@login_required
+def log_set(workout_id, workout_exercise_id, set_number):
+    """Record one performed set. Repeating the same request is harmless (offline retry)."""
+    _owned(workout_id, is_template=False)
+    _owned_entry(workout_id, workout_exercise_id)
+
+    data = request.get_json(silent=True) or request.form
+    db = get_db()
+    try:
+        with db:
+            if data.get('done') in (False, 'false', '0', 0):
+                core_sets.clear_set(db, workout_exercise_id, set_number)
+            else:
+                core_sets.log_set(
+                    db, workout_exercise_id, set_number,
+                    reps=data.get('reps'), weight=data.get('weight'), duration=data.get('duration'),
+                )
+                core.start_workout(db, workout_id)
+    except (ValueError, TypeError):
+        return jsonify({'error': 'Invalid set values'}), 400
 
     return jsonify({'success': True})
 
@@ -492,64 +522,28 @@ def update_exercise(workout_id, workout_exercise_id):
 @login_required
 def start(workout_id):
     """Mark workout as started"""
-    workout = Workout.get_by_id(workout_id)
+    _owned(workout_id, is_template=False)
 
-    if not workout or workout.user_id != current_user.id:
-        abort(404)
+    db = get_db()
+    with db:
+        core.start_workout(db, workout_id)
 
-    update_params = {'status': 'in_progress'}
-    if not workout.started_at:
-        update_params['started_at'] = datetime.now()
-    workout.update(**update_params)
-
-    flash('Workout started! Good luck!', 'success')
     return redirect(url_for('workouts.log', workout_id=workout_id))
 
 
 @workouts_bp.route('/<int:workout_id>/complete', methods=['POST'])
 @login_required
 def complete(workout_id):
-    """Mark workout as completed"""
-    workout = Workout.get_by_id(workout_id)
+    """Mark workout as completed; optionally log untouched exercises as planned"""
+    _owned(workout_id, is_template=False)
 
-    if not workout or workout.user_id != current_user.id:
-        abort(404)
+    db = get_db()
+    with db:
+        if request.form.get('fill') == 'planned':
+            core_sets.log_as_planned(db, workout_id)
+        core.complete_workout(db, workout_id)
 
-    now = datetime.now()
-    update_params = {'status': 'completed'}
-
-    # Only set completed_at if not already set
-    if not workout.completed_at:
-        update_params['completed_at'] = now
-
-    # Only set started_at if not already set
-    if not workout.started_at:
-        if workout.scheduled_date and workout.scheduled_time:
-            try:
-                start_dt = datetime.combine(
-                    datetime.strptime(workout.scheduled_date, '%Y-%m-%d').date(),
-                    datetime.strptime(workout.scheduled_time, '%H:%M').time()
-                )
-                update_params['started_at'] = start_dt
-            except (ValueError, TypeError):
-                update_params['started_at'] = now
-        else:
-            update_params['started_at'] = now
-
-    # Only calculate duration if not already set
-    if not workout.duration_minutes:
-        start = update_params.get('started_at') or (
-            datetime.fromisoformat(workout.started_at) if isinstance(workout.started_at, str) else workout.started_at
-        )
-        end = update_params.get('completed_at') or (
-            datetime.fromisoformat(workout.completed_at) if isinstance(workout.completed_at, str) else workout.completed_at
-        )
-        if start and end and start < end:
-            update_params['duration_minutes'] = int((end - start).total_seconds() / 60)
-
-    workout.update(**update_params)
-
-    flash('Workout completed! Great job!', 'success')
+    flash('Workout completed. Nice work!', 'success')
     return redirect(url_for('workouts.detail', workout_id=workout_id))
 
 
@@ -557,14 +551,10 @@ def complete(workout_id):
 @login_required
 def delete(workout_id):
     """Delete a workout"""
-    workout = Workout.get_by_id(workout_id)
-
-    if not workout or workout.user_id != current_user.id:
-        abort(404)
-
+    workout = _owned(workout_id, is_template=False)
     workout.delete()
 
-    flash('Workout deleted successfully.', 'info')
+    flash('Workout deleted.', 'info')
     return redirect(url_for('workouts.list'))
 
 
@@ -572,133 +562,36 @@ def delete(workout_id):
 @login_required
 def save_as_template(workout_id):
     """Create a template from an existing workout"""
-    workout = Workout.get_by_id(workout_id)
+    _owned(workout_id, is_template=False)
 
-    if not workout or workout.user_id != current_user.id:
-        abort(404)
+    db = get_db()
+    with db:
+        template_id = core.save_as_template(db, current_user.id, workout_id)
 
-    # Create a new template with the workout's name
-    template = Workout.create_template(
-        user_id=current_user.id,
-        name=f"{workout.name} Template",
-        notes=workout.notes
-    )
-
-    # Copy all exercises with their target values
-    exercises = workout.get_exercises()
-    for ex in exercises:
-        WorkoutExercise.add_to_workout(
-            workout_id=template.id,
-            exercise_id=ex['exercise_id'],
-            order_position=ex['order_position'],
-            target_sets=ex['target_sets'],
-            target_reps=ex['target_reps'],
-            target_weight=ex['target_weight'],
-            target_duration=ex['target_duration'],
-            notes=ex['notes']
-        )
-
-    flash(f'Template "{template.name}" created from workout!', 'success')
-    return redirect(url_for('templates.detail', template_id=template.id))
+    flash('Template created from this workout.', 'success')
+    return redirect(url_for('templates.detail', template_id=template_id))
 
 
 @workouts_bp.route('/<int:workout_id>/export/tcx')
 @login_required
 def export_tcx(workout_id):
     """Export workout as TCX file"""
-    workout = Workout.get_by_id(workout_id)
+    workout = _owned(workout_id, is_template=False)
 
-    if not workout or workout.user_id != current_user.id:
-        abort(404)
-
-    # Check that workout has start and end times
     if not workout.started_at or not workout.completed_at:
         flash('Please set start and end times before exporting to TCX', 'danger')
         return redirect(url_for('workouts.detail', workout_id=workout_id))
 
-    # Get workout exercises
     exercises = workout.get_exercises()
-
     if not exercises:
         flash('Cannot export workout without exercises', 'warning')
         return redirect(url_for('workouts.detail', workout_id=workout_id))
 
-    # Generate TCX XML
     tcx_xml = generate_tcx_xml(workout, exercises)
 
-    # Create response with TCX file
+    filename = ''.join(c if c.isalnum() or c in '-_' else '_' for c in workout.name)
     response = make_response(tcx_xml)
     response.headers['Content-Type'] = 'application/vnd.garmin.tcx+xml'
-    response.headers['Content-Disposition'] = f'attachment; filename="{workout.name.replace(" ", "_")}_{workout.id}.tcx"'
+    response.headers['Content-Disposition'] = f'attachment; filename="{filename}_{workout.id}.tcx"'
 
     return response
-
-
-# ===== SUPERSET ROUTES =====
-
-@workouts_bp.route('/<int:workout_id>/superset/create', methods=['POST'])
-@login_required
-def create_superset(workout_id):
-    """Create a superset from selected exercises (AJAX endpoint)"""
-    workout = Workout.get_by_id(workout_id)
-
-    if not workout or workout.user_id != current_user.id:
-        return jsonify({'error': 'Unauthorized'}), 403
-
-    exercise_ids = request.form.getlist('exercise_ids[]', type=int)
-
-    if len(exercise_ids) < 2:
-        return jsonify({'error': 'Select at least 2 exercises'}), 400
-
-    try:
-        group_id = WorkoutExercise.create_superset(exercise_ids)
-        return jsonify({'success': True, 'superset_group_id': group_id})
-    except ValueError as e:
-        return jsonify({'error': str(e)}), 400
-
-
-@workouts_bp.route('/<int:workout_id>/superset/<int:group_id>/dissolve', methods=['POST'])
-@login_required
-def dissolve_superset(workout_id, group_id):
-    """Dissolve a superset entirely (AJAX endpoint)"""
-    workout = Workout.get_by_id(workout_id)
-
-    if not workout or workout.user_id != current_user.id:
-        return jsonify({'error': 'Unauthorized'}), 403
-
-    WorkoutExercise.dissolve_superset(workout_id, group_id)
-    return jsonify({'success': True})
-
-
-@workouts_bp.route('/<int:workout_id>/superset/<int:group_id>/update-reps', methods=['POST'])
-@login_required
-def update_superset_reps(workout_id, group_id):
-    """Update superset target or actual reps (AJAX endpoint)"""
-    workout = Workout.get_by_id(workout_id)
-
-    if not workout or workout.user_id != current_user.id:
-        return jsonify({'error': 'Unauthorized'}), 403
-
-    target_reps = request.form.get('target_reps', type=int)
-    actual_reps = request.form.get('actual_reps', type=int)
-
-    WorkoutExercise.update_superset_reps(
-        workout_id, group_id,
-        target_reps=target_reps,
-        actual_reps=actual_reps
-    )
-
-    return jsonify({'success': True})
-
-
-@workouts_bp.route('/<int:workout_id>/exercises/<int:workout_exercise_id>/remove-from-superset', methods=['POST'])
-@login_required
-def remove_from_superset(workout_id, workout_exercise_id):
-    """Remove exercise from its superset (AJAX endpoint)"""
-    workout = Workout.get_by_id(workout_id)
-
-    if not workout or workout.user_id != current_user.id:
-        return jsonify({'error': 'Unauthorized'}), 403
-
-    WorkoutExercise.remove_from_superset(workout_exercise_id)
-    return jsonify({'success': True})

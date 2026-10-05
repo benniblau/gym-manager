@@ -52,6 +52,14 @@ if [ ! -f "exercises.db" ]; then
     echo "If you have a database initialization script, run it first."
 fi
 
+# The app refuses to start in production without a SECRET_KEY
+if ! grep -q "^SECRET_KEY=..*" .env 2>/dev/null; then
+    echo -e "${RED}Error: SECRET_KEY is not set in .env${NC}"
+    echo "Generate one with:"
+    echo "  python3 -c \"import secrets; print(secrets.token_hex(32))\""
+    exit 1
+fi
+
 # Check if SECRET_KEY is set to default
 if grep -q "your-secret-key-here" .env 2>/dev/null; then
     echo -e "${RED}WARNING: SECRET_KEY is still set to default value!${NC}"
@@ -62,6 +70,17 @@ if grep -q "your-secret-key-here" .env 2>/dev/null; then
     echo
     if [[ ! $REPLY =~ ^[Yy]$ ]]; then
         exit 1
+    fi
+fi
+
+# Bring the database schema up to date (idempotent; a copy is kept first)
+if [ -f "exercises.db" ]; then
+    if python migrations/migrate.py --dry-run | grep -q "would apply"; then
+        mkdir -p backup
+        BACKUP="backup/pre_migrate_$(date +%Y%m%d_%H%M%S).db"
+        sqlite3 exercises.db ".backup '$BACKUP'" 2>/dev/null || cp exercises.db "$BACKUP"
+        echo -e "${YELLOW}Applying database migrations (backup: $BACKUP)${NC}"
+        python migrations/migrate.py
     fi
 fi
 

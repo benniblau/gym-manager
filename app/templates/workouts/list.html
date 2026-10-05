@@ -1,62 +1,51 @@
 {% extends "base.html" %}
+{% from 'includes/workout_row.html' import workout_row %}
 
-{% block title %}My Workouts - Gym Manager{% endblock %}
+{% block title %}Workouts - Gym Manager{% endblock %}
 
 {% block content %}
 <div class="container">
-    <div class="d-flex justify-content-between align-items-center mb-4">
-        <h1><i class="fa-solid fa-calendar-check"></i> My Workouts</h1>
-        <a href="{{ url_for('workouts.create') }}" class="btn btn-primary btn-lg btn-touch">
-            <i class="fa-solid fa-plus"></i> New Workout
+    <div class="page-header">
+        <h1>Workouts</h1>
+        <a href="{{ url_for('workouts.create') }}" class="btn btn-primary btn-touch d-none d-lg-inline-flex">
+            <i class="fa-solid fa-plus"></i> New workout
         </a>
     </div>
 
     {% if workouts %}
-        <div class="list-group">
-            {% for workout in workouts %}
-                <div class="list-group-item">
-                    <div class="d-flex w-100 justify-content-between align-items-center">
-                        <div>
-                            <h5 class="mb-1">
-                                <a href="{{ url_for('workouts.detail', workout_id=workout.id) }}" class="text-decoration-none">
-                                    {{ workout.name }}
-                                </a>
-                            </h5>
-                            <p class="mb-1">
-                                <i class="fa-solid fa-calendar"></i> {{ workout.scheduled_date }}
-                                {% if workout.scheduled_time %}
-                                    - <i class="fa-solid fa-clock"></i> {{ workout.scheduled_time }}
-                                {% endif %}
-                            </p>
-                            {% if workout.notes %}
-                                <small class="text-muted">{{ workout.notes[:100] }}{% if workout.notes|length > 100 %}...{% endif %}</small>
-                            {% endif %}
-                        </div>
-                        <div class="text-end">
-                            <span class="badge bg-{{ 'success' if workout.status == 'completed' else ('warning' if workout.status == 'in_progress' else 'secondary') }} mb-2">
-                                {{ workout.status }}
-                            </span>
-                            <br>
-                            {% if workout.status != 'completed' %}
-                                <a href="{{ url_for('workouts.log', workout_id=workout.id) }}" class="btn btn-primary btn-touch">
-                                    <i class="fa-solid fa-play"></i> Log
-                                </a>
-                            {% endif %}
-                            <a href="{{ url_for('workouts.detail', workout_id=workout.id) }}" class="btn btn-info btn-touch">
-                                <i class="fa-solid fa-eye"></i> View
-                            </a>
-                        </div>
-                    </div>
-                </div>
-            {% endfor %}
-        </div>
+        {% set open = workouts | rejectattr('status', 'equalto', 'completed') | list %}
+        {% set done = workouts | selectattr('status', 'equalto', 'completed') | list %}
+
+        {% if open %}
+            <h2 class="section-title mt-0">To do</h2>
+            <div class="row-list">
+                {% for workout in open | reverse %}{{ workout_row(workout) }}{% endfor %}
+            </div>
+        {% endif %}
+
+        {% if done %}
+            <h2 class="section-title {{ 'mt-0' if not open }}">Completed</h2>
+            <div class="row-list">
+                {% for workout in done %}{{ workout_row(workout) }}{% endfor %}
+            </div>
+        {% endif %}
+
+        {% if page > 1 or has_next %}
+            <div class="d-flex justify-content-between mt-3">
+                <a href="{{ url_for('workouts.list', page=page - 1) }}" class="btn btn-outline-secondary btn-touch {{ 'invisible' if page == 1 }}">
+                    <i class="fa-solid fa-arrow-left"></i> Newer
+                </a>
+                <a href="{{ url_for('workouts.list', page=page + 1) }}" class="btn btn-outline-secondary btn-touch {{ 'invisible' if not has_next }}">
+                    Older <i class="fa-solid fa-arrow-right"></i>
+                </a>
+            </div>
+        {% endif %}
     {% else %}
-        <div class="alert alert-info">
-            <h4><i class="fa-solid fa-circle-info"></i> No workouts yet</h4>
-            <p class="mb-0">
-                Create your first workout to start tracking your gym sessions.
-                <a href="{{ url_for('workouts.create') }}" class="alert-link">Create one now</a>
-            </p>
+        <div class="text-center py-5">
+            <p class="text-muted">No workouts yet.</p>
+            <a href="{{ url_for('workouts.create') }}" class="btn btn-primary btn-lg btn-touch">
+                <i class="fa-solid fa-plus"></i> Create your first workout
+            </a>
         </div>
     {% endif %}
 </div>

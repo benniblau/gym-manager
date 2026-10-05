@@ -1,122 +1,68 @@
 {% extends "base.html" %}
 
-{% block title %}Workout Templates - Gym Manager{% endblock %}
+{% block title %}Templates - Gym Manager{% endblock %}
 
 {% block content %}
 <div class="container">
-    <div class="d-flex justify-content-between align-items-center mb-4">
-        <h1><i class="fa-solid fa-bookmark"></i> Workout Templates</h1>
-        <a href="{{ url_for('templates.create') }}" class="btn btn-primary btn-lg btn-touch">
-            <i class="fa-solid fa-circle-plus"></i> New Template
+    <div class="page-header">
+        <h1>Templates</h1>
+        <a href="{{ url_for('templates.create') }}" class="btn btn-primary btn-touch">
+            <i class="fa-solid fa-plus"></i> New
         </a>
     </div>
 
-    <!-- Filter and Sort Options -->
-    <div class="row mb-4">
-        <div class="col-md-6 mb-2 mb-md-0">
-            <div class="btn-group" role="group">
-                <a href="{{ url_for('templates.list', visibility='all', sort=current_sort) }}"
-                   class="btn btn-sm btn-touch {% if current_visibility == 'all' %}btn-primary{% else %}btn-outline-primary{% endif %}">
-                    <i class="fa-solid fa-layer-group"></i> All
-                </a>
-                <a href="{{ url_for('templates.list', visibility='mine', sort=current_sort) }}"
-                   class="btn btn-sm btn-touch {% if current_visibility == 'mine' %}btn-primary{% else %}btn-outline-primary{% endif %}">
-                    <i class="fa-solid fa-user"></i> Mine
-                </a>
-                <a href="{{ url_for('templates.list', visibility='public', sort=current_sort) }}"
-                   class="btn btn-sm btn-touch {% if current_visibility == 'public' %}btn-primary{% else %}btn-outline-primary{% endif %}">
-                    <i class="fa-solid fa-globe"></i> Public
-                </a>
-            </div>
+    <!-- Filter and sort -->
+    <div class="d-flex flex-wrap justify-content-between gap-2 mb-3">
+        <div class="btn-group" role="group" aria-label="Show">
+            {% for value, text in [('all', 'All'), ('mine', 'Mine'), ('public', 'Public')] %}
+                <a href="{{ url_for('templates.list', visibility=value, sort=current_sort) }}"
+                   class="btn btn-touch {{ 'btn-secondary active' if current_visibility == value else 'btn-outline-secondary' }}"
+                   {% if current_visibility == value %}aria-current="true"{% endif %}>{{ text }}</a>
+            {% endfor %}
         </div>
-        <div class="col-md-6 text-md-end">
-            <div class="btn-group" role="group">
-                <a href="{{ url_for('templates.list', visibility=current_visibility, sort='name') }}"
-                   class="btn btn-sm btn-touch {% if current_sort == 'name' %}btn-secondary{% else %}btn-outline-secondary{% endif %}">
-                    <i class="fa-solid fa-arrow-down-a-z"></i> Name
-                </a>
-                <a href="{{ url_for('templates.list', visibility=current_visibility, sort='usage_count') }}"
-                   class="btn btn-sm btn-touch {% if current_sort == 'usage_count' %}btn-secondary{% else %}btn-outline-secondary{% endif %}">
-                    <i class="fa-solid fa-fire"></i> Most Used
-                </a>
-                <a href="{{ url_for('templates.list', visibility=current_visibility, sort='created_at') }}"
-                   class="btn btn-sm btn-touch {% if current_sort == 'created_at' %}btn-secondary{% else %}btn-outline-secondary{% endif %}">
-                    <i class="fa-solid fa-calendar"></i> Newest
-                </a>
-            </div>
+        <div class="dropdown">
+            <button type="button" class="btn btn-outline-secondary btn-touch" data-bs-toggle="dropdown" aria-expanded="false">
+                <i class="fa-solid fa-arrow-down-wide-short"></i>
+                {{ {'name': 'Name', 'usage_count': 'Most used', 'created_at': 'Newest'}.get(current_sort, 'Name') }}
+            </button>
+            <ul class="dropdown-menu dropdown-menu-end action-menu">
+                {% for value, text in [('name', 'Name'), ('usage_count', 'Most used'), ('created_at', 'Newest')] %}
+                    <li><a class="dropdown-item {{ 'active' if current_sort == value }}"
+                           href="{{ url_for('templates.list', visibility=current_visibility, sort=value) }}">{{ text }}</a></li>
+                {% endfor %}
+            </ul>
         </div>
     </div>
 
     {% if templates %}
-        <div class="row">
+        <div class="row-list">
             {% for template in templates %}
-                <div class="col-md-6 col-lg-4 mb-3">
-                    <div class="card h-100">
-                        <div class="card-body">
-                            <h5 class="card-title d-flex justify-content-between align-items-start">
-                                <span><i class="fa-solid fa-bookmark"></i> {{ template.name }}</span>
-                                {% if template.is_public %}
-                                    <span class="badge bg-success"><i class="fa-solid fa-globe"></i> Public</span>
-                                {% else %}
-                                    <span class="badge bg-secondary"><i class="fa-solid fa-lock"></i> Private</span>
-                                {% endif %}
-                            </h5>
-                            {% if template.notes %}
-                                <p class="card-text text-muted small">{{ template.notes[:100] }}</p>
-                            {% endif %}
-                            <p class="card-text">
-                                {% if not template.is_owner %}
-                                    <small class="text-muted">
-                                        <i class="fa-solid fa-circle-user"></i>
-                                        by {{ template.creator_username }}
-                                    </small>
-                                    <br>
-                                {% endif %}
-                                <small class="text-muted">
-                                    <i class="fa-solid fa-users"></i>
-                                    Used {{ template.usage_count }} times
-                                </small>
-                            </p>
+                <div class="row-link">
+                    <a href="{{ url_for('templates.detail', template_id=template.id) }}" class="row-main text-decoration-none text-reset">
+                        <div class="row-title">{{ template.name }}</div>
+                        <div class="row-sub">
+                            {{ template.exercise_count }} exercises
+                            · {% if template.is_owner %}{{ 'Public' if template.is_public else 'Private' }}{% else %}by {{ template.creator_username }}{% endif %}
+                            {% if template.usage_count %} · used {{ template.usage_count }}×{% endif %}
                         </div>
-                        <div class="card-footer bg-transparent">
-                            <div class="btn-group w-100" role="group">
-                                <a href="{{ url_for('templates.use_template', template_id=template.id) }}"
-                                   class="btn btn-success btn-touch">
-                                    <i class="fa-solid fa-play"></i> Use
-                                </a>
-                                <a href="{{ url_for('templates.detail', template_id=template.id) }}"
-                                   class="btn btn-info btn-touch">
-                                    <i class="fa-solid fa-eye"></i> View
-                                </a>
-                                {% if template.is_owner %}
-                                    <a href="{{ url_for('templates.edit', template_id=template.id) }}"
-                                       class="btn btn-secondary btn-touch">
-                                        <i class="fa-solid fa-pencil"></i> Edit
-                                    </a>
-                                {% endif %}
-                            </div>
-                        </div>
-                    </div>
+                    </a>
+                    <a href="{{ url_for('templates.use_template', template_id=template.id) }}" class="btn btn-outline-success btn-touch">
+                        <i class="fa-solid fa-play"></i> Use
+                    </a>
                 </div>
             {% endfor %}
         </div>
     {% else %}
-        <div class="alert alert-info">
-            <i class="fa-solid fa-circle-info"></i>
-            {% if current_visibility == 'mine' %}
-                No templates yet. <a href="{{ url_for('templates.create') }}" class="alert-link">Create your first template</a>
-            {% elif current_visibility == 'public' %}
-                No public templates available yet.
+        <div class="text-center py-5">
+            {% if current_visibility == 'public' %}
+                <p class="text-muted">No public templates yet.</p>
             {% else %}
-                No templates found.
+                <p class="text-muted">Templates are reusable workout plans.</p>
+                <a href="{{ url_for('templates.create') }}" class="btn btn-primary btn-lg btn-touch">
+                    <i class="fa-solid fa-plus"></i> Create a template
+                </a>
             {% endif %}
         </div>
     {% endif %}
-
-    <div class="mt-4">
-        <a href="{{ url_for('main.dashboard') }}" class="btn btn-outline-secondary btn-lg btn-touch">
-            <i class="fa-solid fa-arrow-left"></i> Back to Dashboard
-        </a>
-    </div>
 </div>
 {% endblock %}

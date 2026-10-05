@@ -204,7 +204,7 @@ document.addEventListener('click', async function(e) {
 
         // Exercem link
         const exercemLink = document.getElementById('details-exercem-link');
-        exercemLink.href = `https://exercem.us/exercises/${encodeURIComponent(data.name.toLowerCase().replace(/ /g, '-'))}`;
+        exercemLink.href = `https://exercem.us/exercises/${encodeURIComponent(data.name.replace(/\//g, ".").replace(/ /g, "_"))}`;
 
         // Garmin link
         const garminLink = document.getElementById('details-garmin-link');
